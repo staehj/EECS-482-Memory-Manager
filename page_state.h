@@ -5,7 +5,7 @@
 enum PAGE_TYPE {SWAP, FILE};
 
 struct PageState {
-    PAGE_TYPE type;  // defer
+    PAGE_TYPE type;
 
     // general
     bool referenced;
@@ -15,10 +15,16 @@ struct PageState {
     // SWAP-backed
     unsigned int swap_block;
 
-    PageState (PAGE_TYPE t, unsigned int block = 0) : referenced(0), resident(0), dirty(0) {
-        // ??
+    // FILE-backed
+    char* filename;
+    unsigned int file_block;
+
+    PageState (PAGE_TYPE t, unsigned int swap_block = 0, char* filename='\0', 
+        unsigned int file_block = 0) : referenced(0), resident(0), dirty(0) {
+        // ?? TODO ??
     };
 };
+
 
 
 // arr = array of PageState
