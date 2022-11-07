@@ -2,6 +2,9 @@
 #include "vm_arena.h"
 #include "vm_pager.h"
 
+#include <memory>
+
+
 enum PAGE_TYPE {SWAP, FILE};
 
 struct PageState {
@@ -19,12 +22,18 @@ struct PageState {
     char* filename;
     unsigned int file_block;
 
-    PageState (PAGE_TYPE t, unsigned int swap_block = 0, char* filename='\0', 
-        unsigned int file_block = 0) : referenced(0), resident(0), dirty(0) {
-        // ?? TODO ??
-    };
+    PageState(PAGE_TYPE t, bool referenced, bool resident, bool dirty,
+        unsigned int swap_block, char* filename, unsigned int file_block)
+        : type(t), referenced(referenced), resident(resident), dirty(dirty),
+        swap_block(swap_block), filename(filename), file_block(file_block) {}
 };
 
+std::shared_ptr<PageState> PageState_deep_copy(std::shared_ptr<PageState> parent) {
+    std::shared_ptr<PageState> child = std::make_shared<PageState>(
+        parent->type, parent->referenced, parent->resident, parent->dirty,
+        parent->swap_block, parent->filename, parent->file_block);
+    return child;
+}
 
 
 // arr = array of PageState

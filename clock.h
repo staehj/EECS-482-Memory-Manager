@@ -1,24 +1,30 @@
 #include <list>
+#include <unordered_set>
 
 #include "vm_pager.h"
 #include "vm_arena.h"
 
 class Clock {
 public:
-    Clock (unsigned int memory_pages) : size(0), max_size (memory_pages) {}
+    Clock (unsigned int memory_pages) : max_size(memory_pages) {}
+
+    unsigned int size() {
+        return clock_pages.size();
+    }
 
     bool is_full() {
-        return size == max_size;
+        return size() == max_size;
     }
 
     // always enqueues at end of clock_pages
-    void enqueue(unsigned int vpn);
+    void enqueue(unsigned int ppn);
 
-    // swap-backed only, can remove any node in O(1)
-    void remove(/* some refernce to which node */);
+    // swap-backed only
+    void remove(std::unordered_set<unsigned int> ppns);
 
     // evicts properly based on SWAP/FILE type, returns PPN of evicted page
     unsigned int evict();
+    
 
 private:
     // pair of push/pop while checking reference bit
@@ -29,6 +35,5 @@ private:
     // unsigned int next_eviction_vpn();
 
     std::list<unsigned int> clock_pages;
-    unsigned int size;
     unsigned int max_size;
 };

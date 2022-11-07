@@ -7,8 +7,12 @@ void Clock::enqueue(unsigned int vpn) {
     clock_pages.push_front(vpn);
 }
 
-void Clock::remove(/*TODO*/) {
-
+void Clock::remove(std::unordered_set<unsigned int> ppns) {
+    for (auto itr = clock_pages.begin(); itr != clock_pages.end(); ++itr) {
+        if (ppns.find(*itr) != ppns.end()) {
+            clock_pages.erase(itr);
+        }
+    }
 }
 
 unsigned int Clock::evict() {

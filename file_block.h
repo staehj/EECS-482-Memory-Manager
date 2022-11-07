@@ -1,8 +1,11 @@
 #include <string.h>
 
 struct FileBlock {
-    char* filename;
+    const char* filename;
     unsigned int block;
+
+    FileBlock(const char* filename, unsigned int block)
+    : filename(filename), block(block) {}
 
     bool operator==(const FileBlock  &) const;
 };  
