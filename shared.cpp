@@ -24,3 +24,7 @@ void update_pte(unsigned int vpn, unsigned int ppn,
     ptbr->ptes[vpn].read_enable = read;
     ptbr->ptes[vpn].write_enable = write;
 }
+
+void* ppn_to_mem(unsigned int ppn) {
+    return vm_physmem+(ppn*VM_PAGESIZE);
+}

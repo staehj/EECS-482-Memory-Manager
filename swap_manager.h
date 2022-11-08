@@ -13,9 +13,11 @@ public:
         return free_blocks.size() - num_reserved;
     }
 
+    // calls unreserve for you
     unsigned int get_next_free() {
         unsigned int res = free_blocks.front();
         free_blocks.pop();
+        unreserve();
         return res;
     }
 
@@ -27,12 +29,13 @@ public:
         num_reserved++;
     }
 
+
+private:
     void unreserve() {
         num_reserved--;
     }
 
 
-private:
     std::queue<unsigned int> free_blocks;
     unsigned int max_size;
     unsigned int num_reserved;

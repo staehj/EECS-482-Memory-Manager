@@ -30,6 +30,9 @@ void vm_init(unsigned int memory_pages, unsigned int swap_blocks) {
     // Initialize page_tables (empty)
     std::unordered_map<pid_t, page_table_t*> page_tables;
 
+    // Initialize phys_mem_pages
+    std::vector<std::shared_ptr<PageState>> phys_mem_pages(memory_pages, nullptr);
+
     // Initialize lowest_invalid_vpns (empty)
     std::unordered_map<page_table_t*, unsigned int> lowest_invalid_vpns;
 
@@ -126,7 +129,7 @@ void *vm_map(const char *filename, unsigned int block) {
 
         // initialize PageState and put into arena
         arena[lowest_invalid_vpn] = std::make_shared<PageState>(
-            PAGE_TYPE::SWAP, 0, 1, 1, 0, 0, nullptr, 0);
+            PAGE_TYPE::SWAP, 0, lowest_invalid_vpn, 1, 1, 0, 0, nullptr, 0);
     }
     // FILE-backed
     else {
@@ -169,13 +172,18 @@ void *vm_map(const char *filename, unsigned int block) {
             }
 
             // write contents of buffer into memory
-            std::memcpy(vm_physmem+(free_ppn*VM_PAGESIZE) , buffer, VM_PAGESIZE);
+            std::memcpy(ppn_to_mem(free_ppn) , buffer, VM_PAGESIZE);
 
-            // add file page to file table
+            // create new PageState
             std::shared_ptr<PageState> new_page_state
                 = std::make_shared<PageState>(
-                    PAGE_TYPE::FILE, free_ppn, 1, 1, 0, 0, filename, block
-                );
+                    PAGE_TYPE::FILE, free_ppn, lowest_invalid_vpn, 1, 1, 0, 0, filename,
+                    block);
+
+            // update phys_mem_pages
+            phys_mem_pages[free_ppn] = new_page_state;
+
+            // add file page to file table
             file_table[file_block] = new_page_state;
 
             // add PageState to arena

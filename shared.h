@@ -13,6 +13,7 @@ extern std::unordered_map<FileBlock, std::shared_ptr<PageState>> file_table;
 extern std::unordered_map<page_table_t*, std::vector<std::shared_ptr<PageState>>> arenas;
 extern std::unordered_map<pid_t, page_table_t*> page_tables;
 extern std::unordered_map<page_table_t*, unsigned int> lowest_invalid_vpns;
+extern std::vector<std::shared_ptr<PageState>> phys_mem_pages;
 extern Clock clock;
 extern SwapManager swap_manager;
 extern char buffer[VM_PAGESIZE];
@@ -23,3 +24,5 @@ bool filename_valid_in_arena(const char* filename, unsigned int lowest_invalid_v
 
 void update_pte(unsigned int vpn, unsigned int ppn,
                 unsigned int read, unsigned int write, page_table_t* ptbr);
+
+void* ppn_to_mem(unsigned int ppn);
