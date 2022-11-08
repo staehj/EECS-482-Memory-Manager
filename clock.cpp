@@ -40,9 +40,8 @@ unsigned int Clock::evict() {
     // mark page as free in clock and phy_mem_pages
     make_free(target_ppn);
 
-    // get corresponding PageState + update phys_mem_pages
+    // get corresponding PageState
     std::shared_ptr<PageState> page_state = phys_mem_pages[target_ppn];
-    phys_mem_pages[target_ppn] = nullptr;
 
     // set PTE to ppn:0 (arbitrary), r:0, w:0
     update_pte(page_state->vpn, 0, 0, 0, page_table_base_register);
@@ -78,6 +77,9 @@ unsigned int Clock::evict() {
     page_state->dirty = false;
     page_state->referenced = false;
     page_state->resident = false;
+
+    // return evicted ppn
+    return target_ppn;
 }
 
 unsigned int Clock::get_free_ppn() {
