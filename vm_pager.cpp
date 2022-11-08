@@ -39,8 +39,9 @@ void vm_init(unsigned int memory_pages, unsigned int swap_blocks) {
     // Initialize buffer
     char buffer[VM_PAGESIZE];
 
-    // Set 0 page pte - TODO: check if we have to do this for kernel pt
-    update_pte(0, 0, 0, 0, page_table_base_register);
+    // // TODO: check if we have to do this for kernel page table
+    // // Set 0 page pte
+    // update_pte(0, 0, 1, 0, page_table_base_register);
 }
 
 int vm_create(pid_t parent_pid, pid_t child_pid) {
@@ -64,6 +65,9 @@ int vm_create(pid_t parent_pid, pid_t child_pid) {
         std::shared_ptr<PageState> child_page = PageState_deep_copy(parent_arena[i]);
         child_arena.push_back(child_page);
     }
+
+    // set child 0 page
+    update_pte(0, 0, 1, 0, child_ptbr);
 
     // Initialize vpn tracker
     lowest_invalid_vpns[page_table_base_register] = 1;
