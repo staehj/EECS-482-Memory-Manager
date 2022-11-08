@@ -80,10 +80,31 @@ void vm_switch(pid_t pid) {
 // Called when current process has a fault at virtual address addr.  write_flag
 // is true if the access that caused the fault is a write.
 int vm_fault(const void* addr, bool write_flag) {
-    // addr->vpn->page_states->PageState
+    // addr->vpn->arena->PageState
 
     // TODO: is eager swap reservation relevant for 4 credit?
+    // ^ YES, we must have a swap block reserved even when the swap page is in memory
 
+
+    // Cases:
+    // Note: r:1, w:1 would never fault (you can read and write to it legally)
+
+    // SWAP-backed
+        // r:0, w:0
+            // invalid
+            // non-resident
+        // r:0, w:1
+            // don't think this is possible...
+        // r:1, w:0
+            // non-dirty (yet)
+    // FILE-backed
+        // r:0, w:0
+            // invalid
+            // non-resident
+        // r:0, w:1
+            // don't think this is possible...
+        // r:1, w:0
+            // non-dirty (yet)
 }
 
 void vm_destroy() {
