@@ -2,21 +2,25 @@
 
 #include <cassert>
 #include <list>
+#include <queue>
+
 
 void Clock::enqueue(unsigned int vpn) {
-    clock_pages.push_front(vpn);
+    active_pages.push_front(vpn);
 }
 
-void Clock::remove(std::unordered_set<unsigned int> ppns) {
-    for (auto itr = clock_pages.begin(); itr != clock_pages.end(); ++itr) {
+void Clock::make_free(std::unordered_set<unsigned int> ppns) {
+    for (auto itr = active_pages.begin(); itr != active_pages.end(); ++itr) {
         if (ppns.find(*itr) != ppns.end()) {
-            clock_pages.erase(itr);
+            active_pages.erase(itr);
+            free_pages.push(*itr);
         }
     }
 }
 
+// NOTE: must perform file_write here
 unsigned int Clock::evict() {
-    assert(is_full);
+    assert(is_full());
 
     // find next unreferenced page vpn to evict using tick
 
@@ -36,7 +40,14 @@ unsigned int Clock::evict() {
 
     // change PageState to all 0
 
-    // pop from clock_pages
+    // pop from active_pages
+}
+
+unsigned int Clock::get_free_ppn() {
+    assert(free_pages.size() > 0);
+    unsigned int ppn = free_pages.front();
+    free_pages.pop();
+    return ppn;
 }
 
 void Clock::tick() {

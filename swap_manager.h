@@ -2,14 +2,15 @@
 
 class SwapManager {
 public:
-    SwapManager(unsigned int swap_blocks) : max_size(swap_blocks) {
+    SwapManager(unsigned int swap_blocks)
+    : max_size(swap_blocks), num_reserved(0) {
         for (unsigned int i = 0; i < max_size; ++i) {
             free_blocks.push(i);
         }
     }
 
     unsigned int num_free() {
-        return free_blocks.size();
+        return free_blocks.size() - num_reserved;
     }
 
     unsigned int get_next_free() {
@@ -22,10 +23,19 @@ public:
         free_blocks.push(block);
     }
 
+    void reserve() {
+        num_reserved++;
+    }
+
+    void unreserve() {
+        num_reserved--;
+    }
+
 
 private:
     std::queue<unsigned int> free_blocks;
     unsigned int max_size;
+    unsigned int num_reserved;
 };
 
 // check free for vm map - eager swap reservation
