@@ -9,8 +9,8 @@
 #include "shared.h"
 
 
-void Clock::enqueue(unsigned int vpn) {
-    active_pages.push_front(vpn);
+void Clock::make_active(unsigned int ppn) {
+    active_pages.push_front(ppn);
 }
 
 void Clock::make_free(std::unordered_set<unsigned int> ppns) {
@@ -37,8 +37,8 @@ unsigned int Clock::evict() {
     // find next unreferenced page ppn to evict using tick
     unsigned int target_ppn = next_eviction_ppn();
 
-    // mark page as free in clock and phy_mem_pages
-    make_free(target_ppn);
+    // re-queue target_ppn into active ppn for fifo
+    active_pages.push_back(target_ppn);
 
     // get corresponding PageState
     std::shared_ptr<PageState> page_state = phys_mem_pages[target_ppn];
@@ -54,10 +54,11 @@ unsigned int Clock::evict() {
             unsigned int target_swap_block = swap_manager.get_next_free();
 
             // write page to swap file (disk)
-            file_write(nullptr, target_swap_block, ppn_to_mem(target_ppn));
+            file_write(nullptr, target_swap_block, ppn_to_mem_addr(target_ppn));
 
             // update PageState swap_block
             page_state->swap_block = target_swap_block;
+            // TODO: consider other updates to PageState
         }
     }
     // if file-backed
@@ -68,8 +69,10 @@ unsigned int Clock::evict() {
         // if dirty, write to disk
         if (page_state->dirty) {
             file_write(page_state->filename, page_state->file_block,
-                ppn_to_mem(target_ppn));
+                ppn_to_mem_addr(target_ppn));
         }
+
+        // TODO: update PageState
     }
 
     // change common PageState vars
@@ -86,6 +89,7 @@ unsigned int Clock::get_free_ppn() {
     assert(free_pages.size() > 0);
     unsigned int ppn = free_pages.front();
     free_pages.pop();
+    active_pages.push_back(ppn);
     return ppn;
 }
 

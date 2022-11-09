@@ -1,3 +1,6 @@
+#ifndef CLOCK_H
+#define CLOCK_H
+
 #include <list>
 #include <unordered_set>
 #include <queue>
@@ -18,7 +21,7 @@ public:
     }
 
     // always enqueues at end of active_pages
-    void enqueue(unsigned int ppn);
+    void make_active(unsigned int ppn);
 
     // marks physical page as free and updates phys_mem_pages
     void make_free(std::unordered_set<unsigned int> ppns);
@@ -49,3 +52,5 @@ private:
     std::list<unsigned int> active_pages;
     unsigned int max_size;
 };
+
+#endif

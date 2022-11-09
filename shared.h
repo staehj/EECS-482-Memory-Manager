@@ -1,3 +1,6 @@
+#ifndef SHARED_H
+#define SHARED_H
+
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -25,4 +28,14 @@ bool filename_valid_in_arena(const char* filename, unsigned int lowest_invalid_v
 void update_pte(unsigned int vpn, unsigned int ppn,
                 unsigned int read, unsigned int write, page_table_t* ptbr);
 
-void* ppn_to_mem(unsigned int ppn);
+void* ppn_to_mem_addr(unsigned int ppn);
+
+unsigned int va_to_vpn(const void* va);
+
+unsigned int evict_or_get_free_ppn();
+
+unsigned int disk_to_mem(const char *filename, unsigned int block);
+
+void make_page_dirty(unsigned int vpn, std::shared_ptr<PageState> page_state);
+
+#endif

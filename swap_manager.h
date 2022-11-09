@@ -1,3 +1,6 @@
+#ifndef SWAP_MANAGER_H
+#define SWAP_MANAGER_H
+
 #include <queue>
 
 class SwapManager {
@@ -25,8 +28,13 @@ public:
         free_blocks.push(block);
     }
 
-    void reserve() {
+    bool reserve() {
+        if (num_free() == 0) {
+            return false;
+        }
         num_reserved++;
+
+        return true;
     }
 
 
@@ -41,9 +49,4 @@ private:
     unsigned int num_reserved;
 };
 
-// check free for vm map - eager swap reservation
-// eg. map file-backed
-//     -> memory is full, so must evict
-//     -> swap backed is chosen as eviction target
-//     -> no free swap blocks in disk
-//     ---> must return nullptr in vm_map
+#endif

@@ -1,3 +1,6 @@
+#ifndef PAGE_STATE_H
+#define PAGE_STATE_H
+
 #include "vm_app.h"
 #include "vm_arena.h"
 #include "vm_pager.h"
@@ -39,21 +42,4 @@ std::shared_ptr<PageState> PageState_deep_copy(std::shared_ptr<PageState> parent
     return child;
 }
 
-
-// arr = array of PageState
-// index: virtual page number - VIRTUAL_ARENA_BASE
-
-// Process asks for (virtual) page N
-// MMU looks up page_table[N] == n'th PTE
-// if PTE is accessible (read != 0 or write != 0)
-//     access ...
-// else (vm_fault get's called with virtual address)
-//     virtual address: extract VPN
-//     arr[VPN - VIRTUAL_ARENA_BASE] == get relevant PageState
-//     if resident:
-//         go to physical page in page table and do stuff
-//     else:
-//         1. figure out which page to evict from phymem (clock)
-//             - call this page page X
-//         2. file_read from swap_block'th block in swap file
-//             eg. file_read(nullptr, swap_block, vm_physmem+(X*VM_PAGESIZE))
+#endif

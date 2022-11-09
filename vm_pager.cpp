@@ -38,10 +38,6 @@ void vm_init(unsigned int memory_pages, unsigned int swap_blocks) {
 
     // Initialize buffer
     char buffer[VM_PAGESIZE];
-
-    // // TODO: check if we have to do this for kernel page table
-    // // Set 0 page pte
-    // update_pte(0, 0, 1, 0, page_table_base_register);
 }
 
 int vm_create(pid_t parent_pid, pid_t child_pid) {
@@ -80,31 +76,129 @@ void vm_switch(pid_t pid) {
 // Called when current process has a fault at virtual address addr.  write_flag
 // is true if the access that caused the fault is a write.
 int vm_fault(const void* addr, bool write_flag) {
-    // addr->vpn->arena->PageState
+    // get PageState and pte using addr
+    unsigned int vpn = va_to_vpn(addr);
 
-    // TODO: is eager swap reservation relevant for 4 credit?
-    // ^ YES, we must have a swap block reserved even when the swap page is in memory
+    // check if vpn is out of bound
+    if (addr < VM_ARENA_BASEADDR 
+        || vpn >= lowest_invalid_vpns[page_table_base_register]) {
+        return -1;
+    }
 
+    // if write to zero page
+    if (vpn == 0 && write_flag == 1) {
+        return -1;
+    }
 
-    // Cases:
+    std::vector<std::shared_ptr<PageState>> arena = arenas[page_table_base_register];
+    std::shared_ptr<PageState> page_state = arena[vpn];
+    page_table_entry_t pte = page_table_base_register->ptes[vpn];
+
     // Note: r:1, w:1 would never fault (you can read and write to it legally)
+    assert(!(pte.read_enable == 1 && pte.write_enable == 1));
+    // r:0, w:1 is impossible (stae-fficial)
+    assert(!(pte.read_enable == 0 && pte.write_enable == 1));
 
     // SWAP-backed
+    if (page_state->type == PAGE_TYPE::SWAP) {
         // r:0, w:0
-            // invalid
+        if (pte.read_enable == 0 && pte.write_enable == 0) {
             // non-resident
-        // r:0, w:1
-            // don't think this is possible...
+            unsigned int ppn = disk_to_mem(nullptr, page_state->swap_block);
+
+            // update phys_mem_pages
+            phys_mem_pages[ppn] = page_state;
+
+            // for eager swap reservation
+            if (!swap_manager.reserve()) {
+                return -1;
+            }
+            swap_manager.make_free(page_state->swap_block);
+
+            // update page state
+            page_state->ppn = ppn;
+            page_state->referenced = true;
+            page_state->resident = true;
+            if (write_flag == 1) {
+                page_state->dirty = true;
+            }
+            page_state->swap_block = 0;
+
+            // update pte
+            if (write_flag == 0) {
+                update_pte(vpn, ppn, 1, 0, page_table_base_register);
+            }
+            else {
+                update_pte(vpn, ppn, 1, 1, page_table_base_register);
+            }
+        }
         // r:1, w:0
-            // non-dirty (yet)
+        else if (pte.read_enable == 1 && pte.write_enable == 0) {
+            assert(write_flag == 1);
+
+            // if fresh swap-backed page (zero)
+            if (page_state->ppn == 0) {
+                unsigned int free_ppn = evict_or_get_free_ppn();
+
+                // update page state
+                page_state->ppn = free_ppn;
+                page_state->referenced = true;
+                page_state->resident = true;
+                page_state->dirty = true;
+                page_state->swap_block = 0;
+
+                // update swap manager (eager swap reservation)
+                if (!swap_manager.reserve()) {
+                    return -1;
+                }
+
+                // update pte
+                update_pte(vpn, free_ppn, 1, 1, page_table_base_register);
+            }
+            // if existing clean page
+            else {
+                assert(page_state->swap_block == 0);
+                make_page_dirty(vpn, page_state);
+            }
+        }
+    }
     // FILE-backed
+    else {
         // r:0, w:0
-            // invalid
+        if (pte.read_enable == 0 && pte.write_enable == 0) {
             // non-resident
-        // r:0, w:1
-            // don't think this is possible...
+            unsigned int ppn = disk_to_mem(page_state->filename, page_state->file_block);
+
+            // update phys_mem_pages
+            phys_mem_pages[ppn] = page_state;
+
+            // insert into file table
+            assert(file_table.find(FileBlock(page_state->filename,
+                   page_state->file_block)) == file_table.end());
+            file_table[FileBlock(page_state->filename, page_state->file_block)]
+                = page_state;
+
+            // update page state
+            page_state->ppn = ppn;
+            page_state->referenced = true;
+            page_state->resident = true;
+            if (write_flag == 1) {
+                page_state->dirty = true;
+            }
+
+            // update pte
+            if (write_flag == 0) {
+                update_pte(vpn, ppn, 1, 0, page_table_base_register);
+            }
+            else {
+                update_pte(vpn, ppn, 1, 1, page_table_base_register);
+            }
+        }
         // r:1, w:0
-            // non-dirty (yet)
+        else if (pte.read_enable == 1 && pte.write_enable == 0) {
+            make_page_dirty(vpn, page_state);
+        }
+    }
 }
 
 void vm_destroy() {
@@ -183,30 +277,32 @@ void *vm_map(const char *filename, unsigned int block) {
         }
         // file not in file_table
         else {
-            // read in file into buffer
-            file_read(filename, block, buffer);
+            // // read in file into buffer
+            // file_read(filename, block, buffer);
 
-            // if memory is full
-            unsigned int free_ppn;
-            if (clock.is_full()) {
-                // evict using clock algorithm
-                free_ppn = clock.evict();
-            }
-            else {
-                free_ppn = clock.get_free_ppn();
-            }
+            // // if memory is full
+            // unsigned int free_ppn;
+            // if (clock.is_full()) {
+            //     // evict using clock algorithm
+            //     free_ppn = clock.evict();
+            // }
+            // else {
+            //     free_ppn = clock.get_free_ppn();
+            // }
 
-            // write contents of buffer into memory
-            std::memcpy(ppn_to_mem(free_ppn) , buffer, VM_PAGESIZE);
+            // // write contents of buffer into memory
+            // std::memcpy(ppn_to_mem_addr(free_ppn) , buffer, VM_PAGESIZE);
+
+            unsigned int ppn = disk_to_mem(filename, block);
 
             // create new PageState
             std::shared_ptr<PageState> new_page_state
                 = std::make_shared<PageState>(
-                    PAGE_TYPE::FILE, free_ppn, lowest_invalid_vpn, 1, 1, 0, 0, filename,
+                    PAGE_TYPE::FILE, ppn, lowest_invalid_vpn, 1, 1, 0, 0, filename,
                     block);
 
             // update phys_mem_pages
-            phys_mem_pages[free_ppn] = new_page_state;
+            phys_mem_pages[ppn] = new_page_state;
 
             // add file page to file table
             file_table[file_block] = new_page_state;
@@ -215,7 +311,7 @@ void *vm_map(const char *filename, unsigned int block) {
             arena[lowest_invalid_vpn] = new_page_state;
 
             // add pte to page table
-            update_pte(lowest_invalid_vpn, free_ppn, 1, 0, page_table_base_register);
+            update_pte(lowest_invalid_vpn, ppn, 1, 0, page_table_base_register);
         }
     }
 
