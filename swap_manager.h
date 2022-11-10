@@ -5,8 +5,16 @@
 
 class SwapManager {
 public:
-    SwapManager(unsigned int swap_blocks)
-    : max_size(swap_blocks), num_reserved(0) {
+    // SwapManager(unsigned int swap_blocks)
+    // : max_size(swap_blocks), num_reserved(0) {
+    //     for (unsigned int i = 0; i < max_size; ++i) {
+    //         free_blocks.push(i);
+    //     }
+    // }
+
+    void fill_swap_blocks(unsigned int swap_blocks) {
+        max_size = swap_blocks;
+        num_reserved = 0;
         for (unsigned int i = 0; i < max_size; ++i) {
             free_blocks.push(i);
         }

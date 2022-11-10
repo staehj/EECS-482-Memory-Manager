@@ -5,7 +5,7 @@
 #include <unordered_set>
 
 #include "clock.h"
-#include "file_block.h"
+// #include "file_block.h"
 #include "page_state.h"
 #include "shared.h"
 #include "swap_manager.h"
@@ -16,28 +16,31 @@ void vm_init(unsigned int memory_pages, unsigned int swap_blocks) {
     memset(vm_physmem, 0, VM_PAGESIZE);
 
     // Initialize Clock (empty)
-    Clock clock(memory_pages);
+    clock_.fill_memory_pages(memory_pages);
 
     // Initialize SwapManager
-    SwapManager swap_manager(swap_blocks);
+    // SwapManager swap_manager(swap_blocks);
+    swap_manager.fill_swap_blocks(swap_blocks);
 
-    // Initialize file_table (empty)
-    std::unordered_map<FileBlock, std::shared_ptr<PageState>> file_table;
+    // // Initialize file_table (empty)
+    // // std::unordered_map<FileBlock, std::shared_ptr<PageState>> file_table;
+    // std::unordered_map<const char*, std::unordered_map<unsigned int, std::shared_ptr<PageState>>> file_table;
 
-    // Initialize page_states (empty)
-    std::unordered_map<page_table_t*, std::vector<std::shared_ptr<PageState>>> arenas;
+    // // Initialize page_states (empty)
+    // std::unordered_map<page_table_t*, std::vector<std::shared_ptr<PageState>>> arenas;
 
-    // Initialize page_tables (empty)
-    std::unordered_map<pid_t, page_table_t*> page_tables;
+    // // Initialize page_tables (empty)
+    // std::unordered_map<pid_t, page_table_t*> page_tables;
 
     // Initialize phys_mem_pages
-    std::vector<std::shared_ptr<PageState>> phys_mem_pages(memory_pages, nullptr);
+    // std::vector<std::shared_ptr<PageState>> phys_mem_pages(memory_pages, nullptr);
+    phys_mem_pages.resize(memory_pages, nullptr);
 
-    // Initialize lowest_invalid_vpns (empty)
-    std::unordered_map<page_table_t*, unsigned int> lowest_invalid_vpns;
+    // // Initialize lowest_invalid_vpns (empty)
+    // std::unordered_map<page_table_t*, unsigned int> lowest_invalid_vpns;
 
-    // Initialize buffer
-    char buffer[VM_PAGESIZE];
+    // // Initialize buffer
+    // char buffer[VM_PAGESIZE];
 }
 
 int vm_create(pid_t parent_pid, pid_t child_pid) {
@@ -53,14 +56,19 @@ int vm_create(pid_t parent_pid, pid_t child_pid) {
     // add to page_tables
     page_tables[child_pid] = child_ptbr;
 
-    // create deep copy of parent arena
-    std::vector<std::shared_ptr<PageState>> parent_arena = arenas[parent_ptbr];
+    // // create deep copy of parent arena
+    // // unsure if this is even needed for 4 credit
+    // std::vector<std::shared_ptr<PageState>> parent_arena = arenas[parent_ptbr];
+    // std::vector<std::shared_ptr<PageState>> child_arena;
+    // child_arena.reserve(parent_arena.size());
+    // for (size_t i = 0; i < parent_arena.size(); ++i) {
+    //     std::shared_ptr<PageState> child_page = PageState_deep_copy(parent_arena[i]);
+    //     child_arena.push_back(child_page);
+    // }
+
+    // add arena to arenas
     std::vector<std::shared_ptr<PageState>> child_arena;
-    child_arena.reserve(parent_arena.size());
-    for (size_t i = 0; i < parent_arena.size(); ++i) {
-        std::shared_ptr<PageState> child_page = PageState_deep_copy(parent_arena[i]);
-        child_arena.push_back(child_page);
-    }
+    arenas[child_ptbr] = child_arena;
 
     // set child 0 page
     update_pte(0, 0, 1, 0, child_ptbr);
@@ -79,13 +87,13 @@ int vm_fault(const void* addr, bool write_flag) {
     // get PageState and pte using addr
     unsigned int vpn = va_to_vpn(addr);
 
-    // check if vpn is out of bound
+    // INVALID CASEE: vpn is out of bounds (not in valid arena)
     if (addr < VM_ARENA_BASEADDR 
         || vpn >= lowest_invalid_vpns[page_table_base_register]) {
         return -1;
     }
 
-    // if write to zero page
+    // INVALID CASE: writing to zero page
     if (vpn == 0 && write_flag == 1) {
         return -1;
     }
@@ -100,10 +108,10 @@ int vm_fault(const void* addr, bool write_flag) {
     assert(!(pte.read_enable == 0 && pte.write_enable == 1));
 
     // SWAP-backed
-    if (page_state->type == PAGE_TYPE::SWAP) {
+    if (page_state->type == PAGE_TYPE::SWAP_BACKED) {
         // r:0, w:0
         if (pte.read_enable == 0 && pte.write_enable == 0) {
-            // non-resident
+            // CASE: non-resident
             unsigned int ppn = disk_to_mem(nullptr, page_state->swap_block);
 
             // update phys_mem_pages
@@ -136,9 +144,17 @@ int vm_fault(const void* addr, bool write_flag) {
         else if (pte.read_enable == 1 && pte.write_enable == 0) {
             assert(write_flag == 1);
 
-            // if fresh swap-backed page (zero)
+            // CASE: fresh swap-backed page (zero)
             if (page_state->ppn == 0) {
                 unsigned int free_ppn = evict_or_get_free_ppn();
+
+                // update phys_mem_pages
+                phys_mem_pages[free_ppn] = page_state;
+
+                // update swap manager (eager swap reservation)
+                if (!swap_manager.reserve()) {
+                    return -1;
+                }
 
                 // update page state
                 page_state->ppn = free_ppn;
@@ -147,15 +163,10 @@ int vm_fault(const void* addr, bool write_flag) {
                 page_state->dirty = true;
                 page_state->swap_block = 0;
 
-                // update swap manager (eager swap reservation)
-                if (!swap_manager.reserve()) {
-                    return -1;
-                }
-
                 // update pte
                 update_pte(vpn, free_ppn, 1, 1, page_table_base_register);
             }
-            // if existing clean page
+            // CASE: existing clean page
             else {
                 assert(page_state->swap_block == 0);
                 make_page_dirty(vpn, page_state);
@@ -166,17 +177,19 @@ int vm_fault(const void* addr, bool write_flag) {
     else {
         // r:0, w:0
         if (pte.read_enable == 0 && pte.write_enable == 0) {
-            // non-resident
+            // CASE: non-resident
             unsigned int ppn = disk_to_mem(page_state->filename, page_state->file_block);
 
             // update phys_mem_pages
             phys_mem_pages[ppn] = page_state;
 
             // insert into file table
-            assert(file_table.find(FileBlock(page_state->filename,
-                   page_state->file_block)) == file_table.end());
-            file_table[FileBlock(page_state->filename, page_state->file_block)]
-                = page_state;
+            // assert(file_table.find(FileBlock(page_state->filename,
+            //        page_state->file_block)) == file_table.end());
+            // file_table[FileBlock(page_state->filename, page_state->file_block)]
+            //     = page_state;
+            assert(!file_in_file_table(page_state->filename, page_state->file_block));
+            file_table[page_state->filename][page_state->file_block] = page_state;
 
             // update page state
             page_state->ppn = ppn;
@@ -195,6 +208,8 @@ int vm_fault(const void* addr, bool write_flag) {
             }
         }
         // r:1, w:0
+        // CASE: existing clean page
+        // Note: writing to 0 page is already considered invalid in earlier check
         else if (pte.read_enable == 1 && pte.write_enable == 0) {
             make_page_dirty(vpn, page_state);
         }
@@ -206,7 +221,7 @@ void vm_destroy() {
     std::unordered_set<unsigned int> ppns;
     for (unsigned int i = 0; i < arena.size(); ++i) {
         std::shared_ptr<PageState> page = arena[i];
-        if (page->type == PAGE_TYPE::SWAP) {
+        if (page->type == PAGE_TYPE::SWAP_BACKED) {
             // in MEMORY
             if (page->resident) {
                 unsigned int ppn = vpn_to_ppn(i);
@@ -221,7 +236,7 @@ void vm_destroy() {
     }
 
     // Clock: remove all swap pages being used by process, and mark as free
-    clock.make_free(ppns);
+    clock_.make_free(ppns);
 
     // delete swap block PageStates
     arenas.erase(page_table_base_register);
@@ -248,7 +263,7 @@ void *vm_map(const char *filename, unsigned int block) {
 
         // initialize PageState and put into arena
         arena[lowest_invalid_vpn] = std::make_shared<PageState>(
-            PAGE_TYPE::SWAP, 0, lowest_invalid_vpn, 1, 1, 0, 0, nullptr, 0);
+            PAGE_TYPE::SWAP_BACKED, 0, lowest_invalid_vpn, 1, 1, 0, 0, nullptr, 0);
     }
     // FILE-backed
     else {
@@ -258,54 +273,42 @@ void *vm_map(const char *filename, unsigned int block) {
         }
 
         // page in file_table
-        FileBlock file_block(filename, block);
-        if (file_table.find(file_block) != file_table.end()) {
-            std::shared_ptr<PageState> page_state_ptr = file_table[file_block];
+        // FileBlock file_block(filename, block);
+        // if (file_table.find(file_block) != file_table.end()) {
+        if (file_in_file_table(filename, block)) {
+            // std::shared_ptr<PageState> page_state = file_table[file_block];
+            std::shared_ptr<PageState> page_state = file_table[filename][block];
 
             // set arena PageState to point to file_table PageState
-            arena[lowest_invalid_vpn] = page_state_ptr;
+            arena[lowest_invalid_vpn] = page_state;
 
             // add pte, check PageState.dirty for write_enable
-            if (page_state_ptr->dirty) {
-                update_pte(lowest_invalid_vpn, page_state_ptr->ppn,
+            if (page_state->dirty) {
+                update_pte(lowest_invalid_vpn, page_state->ppn,
                     1, 1, page_table_base_register);
             }
             else {
-                update_pte(lowest_invalid_vpn, page_state_ptr->ppn,
+                update_pte(lowest_invalid_vpn, page_state->ppn,
                     1, 0, page_table_base_register);
             }
         }
         // file not in file_table
         else {
-            // // read in file into buffer
-            // file_read(filename, block, buffer);
-
-            // // if memory is full
-            // unsigned int free_ppn;
-            // if (clock.is_full()) {
-            //     // evict using clock algorithm
-            //     free_ppn = clock.evict();
-            // }
-            // else {
-            //     free_ppn = clock.get_free_ppn();
-            // }
-
-            // // write contents of buffer into memory
-            // std::memcpy(ppn_to_mem_addr(free_ppn) , buffer, VM_PAGESIZE);
-
-            unsigned int ppn = disk_to_mem(filename, block);
+            const char* page_filename = get_filename(filename);
+            unsigned int ppn = disk_to_mem(page_filename, block);
 
             // create new PageState
             std::shared_ptr<PageState> new_page_state
                 = std::make_shared<PageState>(
-                    PAGE_TYPE::FILE, ppn, lowest_invalid_vpn, 1, 1, 0, 0, filename,
-                    block);
+                    PAGE_TYPE::FILE_BACKED, ppn, lowest_invalid_vpn, 1, 1, 0, 0,
+                    page_filename, block);
 
             // update phys_mem_pages
             phys_mem_pages[ppn] = new_page_state;
 
             // add file page to file table
-            file_table[file_block] = new_page_state;
+            // file_table[file_block] = new_page_state;
+            file_table[filename][block] = new_page_state;
 
             // add PageState to arena
             arena[lowest_invalid_vpn] = new_page_state;

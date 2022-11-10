@@ -10,7 +10,14 @@
 
 class Clock {
 public:
-    Clock (unsigned int memory_pages) : max_size(memory_pages) {
+    // Clock (unsigned int memory_pages) : max_size(memory_pages) {
+    //     for (unsigned int i = 1; i < memory_pages; ++i) {
+    //         free_pages.push(i);
+    //     }
+    // }
+
+    void fill_memory_pages(unsigned int memory_pages) {
+        max_size = memory_pages;
         for (unsigned int i = 1; i < memory_pages; ++i) {
             free_pages.push(i);
         }

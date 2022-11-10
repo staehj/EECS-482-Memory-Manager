@@ -47,32 +47,31 @@ unsigned int Clock::evict() {
     update_pte(page_state->vpn, 0, 0, 0, page_table_base_register);
 
     // if swap-backed
-    if (page_state->type == PAGE_TYPE::SWAP) {
+    if (page_state->type == PAGE_TYPE::SWAP_BACKED) {
         // if dirty, write to swap disk
         if (page_state->dirty) {
             // determine free swap block + unreserve a swap block
             unsigned int target_swap_block = swap_manager.get_next_free();
 
             // write page to swap file (disk)
-            file_write(nullptr, target_swap_block, ppn_to_mem_addr(target_ppn));
+            file_write(nullptr, target_swap_block, (void*)ppn_to_mem_addr(target_ppn));
 
             // update PageState swap_block
             page_state->swap_block = target_swap_block;
-            // TODO: consider other updates to PageState
         }
     }
+
     // if file-backed
     else {
         // remove entry from file_table
-        file_table.erase(FileBlock(page_state->filename, page_state->file_block));
+        // file_table.erase(FileBlock(page_state->filename, page_state->file_block));
+        remove_file_table_entry(page_state->filename, page_state->file_block);
 
         // if dirty, write to disk
         if (page_state->dirty) {
             file_write(page_state->filename, page_state->file_block,
-                ppn_to_mem_addr(target_ppn));
+                (void*)ppn_to_mem_addr(target_ppn));
         }
-
-        // TODO: update PageState
     }
 
     // change common PageState vars
