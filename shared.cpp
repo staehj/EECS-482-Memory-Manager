@@ -1,13 +1,17 @@
 #include "shared.h"
 
+#include <cassert>
+#include <cstdio>
 #include <memory>
 #include <string>
 #include <unordered_map>
 
 #include "vm_pager.h"
 
-
+//
 // Initialize global variables
+//
+
 // Initialize Clock (empty)
 Clock clock_;
 
@@ -18,7 +22,7 @@ SwapManager swap_manager;
 // std::unordered_map<FileBlock, std::shared_ptr<PageState>> file_table;
 std::unordered_map<const char*, std::unordered_map<unsigned int, std::shared_ptr<PageState>>> file_table;
 
-// Initialize page_states (empty)
+// Initialize arenas (empty)
 std::unordered_map<page_table_t*, std::vector<std::shared_ptr<PageState>>> arenas;
 
 // Initialize page_tables (empty)
@@ -27,12 +31,8 @@ std::unordered_map<pid_t, page_table_t*> page_tables;
 // Initialize phys_mem_pages
 std::vector<std::shared_ptr<PageState>> phys_mem_pages;
 
-// Initialize lowest_invalid_vpns (empty)
-std::unordered_map<page_table_t*, unsigned int> lowest_invalid_vpns;
-
 // Initialize buffer
 char buffer[VM_PAGESIZE];
-
 
 
 bool file_in_file_table(const char* filename, unsigned int block) {
@@ -57,19 +57,6 @@ unsigned int vpn_to_ppn(unsigned int vpn) {
     return page_table_base_register->ptes[vpn].ppage;
 }
 
-// TODO: strlen assumes contiguous in memory, but page need not be
-// better idea to read through byte-by-byte and check for null character
-intptr_t end_of_filename(const char* filename) {
-    return (intptr_t)filename + strlen(filename) + 1;
-}
-
-bool filename_valid_in_arena(const char* filename, unsigned int lowest_invalid_vpn) {
-    if (end_of_filename(filename) > (intptr_t)VM_ARENA_BASEADDR+lowest_invalid_vpn){
-        return false;
-    }
-    return true;
-}
-
 // DOES NOT increment vpn (lowest invalid)
 void update_pte(unsigned int vpn, unsigned int ppn,
                 unsigned int read, unsigned int write, page_table_t* ptbr) {
@@ -83,8 +70,7 @@ intptr_t ppn_to_mem_addr(unsigned int ppn) {
 }
 
 unsigned int va_to_vpn(const void* va){
-    intptr_t va_int = (intptr_t) va;
-    return va_int>>16 - (intptr_t) VM_ARENA_BASEADDR;
+    return ((intptr_t)va - (intptr_t)VM_ARENA_BASEADDR)>>16;
 }
 
 //// free_ppn
@@ -159,7 +145,6 @@ const char* get_filename(const char* va) {
     unsigned int offset = (intptr_t) va & 0xffff;
     unsigned int vpn = (intptr_t) va >> 16;
 
-    unsigned int lowest_invalid_vpn = lowest_invalid_vpns[page_table_base_register];
     std::string file_name_string;
 
     unsigned int vpn_index = vpn - (intptr_t) VM_ARENA_BASEADDR;
@@ -168,7 +153,7 @@ const char* get_filename(const char* va) {
 
     while (true) {
         // check if vpn is in valid range
-        if (vpn <= (intptr_t) VM_ARENA_BASEADDR || vpn >= lowest_invalid_vpn) {
+        if (vpn <= (intptr_t) VM_ARENA_BASEADDR || vpn >= lowest_invalid_vpn()) {
             return nullptr;
         }
 
@@ -206,7 +191,8 @@ const char* get_filename(const char* va) {
         // if null character not reached by end, increment vpn and continue
         if (cur_char == '\0') {
             // turn vector into C-string
-            return file_name_string.c_str();
+            const char* file_name_c_string = file_name_string.c_str();
+            return file_name_c_string;
         }
 
         // update values to read from start of next page
@@ -214,4 +200,15 @@ const char* get_filename(const char* va) {
         vpn_index++;
         offset = 0;
     }
+}
+
+bool filename_valid_in_arena(const char* filename) {
+    if (get_filename(filename)) {
+        return true;
+    }
+    return false;
+}
+
+unsigned int lowest_invalid_vpn() {
+    return arenas[page_table_base_register].size();
 }

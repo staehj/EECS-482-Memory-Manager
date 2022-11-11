@@ -34,11 +34,4 @@ struct PageState {
         {}
 };
 
-// std::shared_ptr<PageState> PageState_deep_copy(std::shared_ptr<PageState> parent) {
-//     std::shared_ptr<PageState> child = std::make_shared<PageState>(
-//         parent->type, parent->ppn, parent->vpn, parent->referenced, parent->resident,
-//         parent->dirty, parent->swap_block, parent->filename, parent->file_block);
-//     return child;
-// }
-
 #endif

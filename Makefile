@@ -22,7 +22,7 @@ pager: ${PAGER_OBJS} ${LIBVM_PAGER}
 	${CC} -o $@ $^
 
 # Compile an application program
-app: app.cpp ${LIBVM_APP}
+app: test1.4.cpp ${LIBVM_APP}
 	${CC} -o $@ $^ -ldl
 
 # Generic rules for compiling a source file to an object file
@@ -33,3 +33,9 @@ app: app.cpp ${LIBVM_APP}
 
 clean:
 	rm -f ${PAGER_OBJS} pager app
+
+debug%: test%.cpp ${LIBVM_APP}
+	${CC} -o $@ $^ -g
+
+test%: test%.cpp ${LIBVM_APP}
+	${CC} -o $@ $^
