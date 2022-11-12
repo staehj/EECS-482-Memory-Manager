@@ -21,6 +21,8 @@ extern std::vector<std::shared_ptr<PageState>> phys_mem_pages;
 extern Clock clock_;
 extern SwapManager swap_manager;
 
+void sanitize_page_table(page_table_t* pt);
+
 bool file_in_file_table(const char* filename, unsigned int block);
 
 void remove_file_table_entry(const char* filename, unsigned int block);

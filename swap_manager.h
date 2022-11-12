@@ -45,13 +45,12 @@ public:
         return true;
     }
 
-
-private:
     void unreserve() {
         num_reserved--;
     }
 
 
+private:
     std::queue<unsigned int> free_blocks;
     unsigned int max_size;
     unsigned int num_reserved;

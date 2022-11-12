@@ -9,6 +9,7 @@ int main() {
     /* 4 pages of physical memory in the system */
     if (fork()) { // parent
         for (int i = 0; i < 200; ++i) {
+            printf("i: %i\n");
             char *temp = (char *) vm_map(nullptr, 0);
             temp[0] = 'a';
         }

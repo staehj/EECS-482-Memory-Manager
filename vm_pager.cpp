@@ -30,20 +30,23 @@ int vm_create(pid_t parent_pid, pid_t child_pid) {
     // create deep copy of parent page table
     page_table_t* child_ptbr = new page_table_t();
 
+    // just to be safe, make sure all entries are sanitized to 0
+    sanitize_page_table(child_ptbr);
+
     // add to page_tables
     page_tables[child_pid] = child_ptbr;
 
     // create 0 page in arena
     std::vector<std::shared_ptr<PageState>> child_arena;
-    // FILE-BACKED for 0 page is arbitrary and does not impact the progam
-    child_arena.push_back(std::make_shared<PageState>(PAGE_TYPE::FILE_BACKED, 0, 0,
-        false, true, false, 0, nullptr, 0));
+    // // FILE-BACKED for 0 page is arbitrary and does not impact the progam 
+    // child_arena.push_back(std::make_shared<PageState>(PAGE_TYPE::FILE_BACKED, 0, 0,////
+    //     false, true, false, 0, nullptr, 0));
 
     // add arena to arenas
     arenas[child_ptbr] = child_arena;
 
-    // set child 0 page
-    update_pte(0, 0, 1, 0, child_ptbr);
+    // // set child 0 page
+    // update_pte(0, 0, 1, 0, child_ptbr);////
 
     return 0;
 }
@@ -58,16 +61,16 @@ int vm_fault(const void* addr, bool write_flag) {
     // get PageState and pte using addr
     unsigned int vpn = va_to_vpn(addr);
 
-    // INVALID CASEE: vpn is out of bounds (not in valid arena)
-    if (addr < VM_ARENA_BASEADDR 
-        || vpn >= lowest_invalid_vpn()) {
+    // INVALID CASE: vpn is out of bounds (not in valid arena)
+    // if (addr < VM_ARENA_BASEADDR 
+    if (vpn < 0 || vpn >= lowest_invalid_vpn()) {
         return -1;
     }
 
-    // INVALID CASE: writing to zero page
-    if (vpn == 0 && write_flag == 1) {
-        return -1;
-    }
+    // // INVALID CASE: writing to zero page
+    // if (vpn == 0 && write_flag == 1) {
+    //     return -1;
+    // }
 
     std::vector<std::shared_ptr<PageState>> &arena = arenas[page_table_base_register];
     std::shared_ptr<PageState> &page_state = arena[vpn];
@@ -194,6 +197,7 @@ void vm_destroy() {
             if (page->resident) {
                 unsigned int ppn = vpn_to_ppn(i);
                 ppns.insert(ppn);
+                swap_manager.unreserve();
             }
             // in DISK
             else {
@@ -217,6 +221,9 @@ void vm_destroy() {
         }
     }
 
+    // just to be safe, make sure all entries are sanitized to 0
+    sanitize_page_table(page_table_base_register);
+
     // delete page table
     delete page_table_base_register;
 }
@@ -224,7 +231,7 @@ void vm_destroy() {
 void *vm_map(const char *filename, unsigned int block) {
     // check that arena is not full
     unsigned int new_vpn = lowest_invalid_vpn();
-    if (new_vpn == VM_ARENA_SIZE) {
+    if (new_vpn == (unsigned int) VM_ARENA_SIZE) {
         return nullptr;
     }
 

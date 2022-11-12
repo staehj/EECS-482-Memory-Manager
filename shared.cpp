@@ -34,6 +34,14 @@ std::unordered_map<pid_t, page_table_t*> page_tables;
 std::vector<std::shared_ptr<PageState>> phys_mem_pages;
 
 
+void sanitize_page_table(page_table_t* pt) {
+    for (unsigned int i = 0; i < VM_ARENA_SIZE/VM_PAGESIZE; ++i) {
+        pt->ptes[i].ppage = 0;
+        pt->ptes[i].read_enable = 0;
+        pt->ptes[i].write_enable = 0;
+    }
+}
+
 bool file_in_file_table(const char* filename, unsigned int block) {
     std::string filename_string = std::string(filename);
     if (file_table.find(filename_string) != file_table.end()) {
@@ -142,18 +150,15 @@ unsigned int last_addr_in_ppn(unsigned int ppn) {
 const char* get_filename(const char* va) {
     // split va into vpn + offset
     unsigned int offset = (intptr_t) va & 0xffff;
-    unsigned int vpn = (intptr_t) va >> 16;
-
+    unsigned int vpn_index = va_to_vpn(va);
 
     std::string file_name_string = "";
-
-    unsigned int vpn_index = va_to_vpn(va);
 
     std::vector<std::shared_ptr<PageState>> &arena = arenas[page_table_base_register];
 
     while (true) {
         // check if vpn is in valid range
-        if ((intptr_t) va <= (intptr_t) VM_ARENA_BASEADDR
+        if ((intptr_t) va < (intptr_t) VM_ARENA_BASEADDR
         || vpn_index >= lowest_invalid_vpn()) {
             return nullptr;
         }
@@ -203,7 +208,6 @@ const char* get_filename(const char* va) {
         }
 
         // update values to read from start of next page
-        vpn++;
         vpn_index++;
         offset = 0;
     }

@@ -5,8 +5,8 @@
 #include <cassert>
 #include <cstring>
 
-int main() {
-    if (fork()) { // parent
+int main() { // main process
+    if (fork()) { // parent process
         char *filename = (char *) vm_map(nullptr, 0);
         strcpy(filename, "lampson83.txt");
         char* file = (char*) vm_map(filename, 0);
@@ -15,7 +15,7 @@ int main() {
         char *swap2 = (char *) vm_map(nullptr, 0);  // first swap evicted
         swap2[0] = '2';
     }
-    else {
+    else { // child process
         char *filename_child = (char *) vm_map(nullptr, 0);
         strcpy(filename_child, "lampson83.txt");
         char* file_child = (char*) vm_map(filename_child, 0);
