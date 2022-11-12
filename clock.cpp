@@ -1,6 +1,9 @@
 #include "clock.h"
 
 #include <cassert>
+#include <cstdio>
+#include <cstring>
+#include <iterator>
 #include <list>
 #include <memory>
 #include <queue>
@@ -14,10 +17,18 @@ void Clock::make_active(unsigned int ppn) {
 }
 
 void Clock::make_free(std::unordered_set<unsigned int> ppns) {
-    for (auto itr = active_pages.begin(); itr != active_pages.end(); ++itr) {
-        if (ppns.find(*itr) != ppns.end()) {
-            make_free_itr(itr);
-        }
+    // Optmized version, commented just to be safe though
+    // auto itr = active_pages.begin();
+    // while (itr != active_pages.end()) {
+    //     auto next = std::next(itr);
+    //     if (ppns.find(*itr) != ppns.end()) {
+    //         make_free_itr(itr);
+    //     }
+    //     itr = next;
+    // }
+
+    for (auto itr = ppns.begin(); itr != ppns.end(); ++itr) {
+        make_free(*itr);
     }
 }
 
@@ -41,7 +52,7 @@ unsigned int Clock::evict() {
     active_pages.push_back(target_ppn);
 
     // get corresponding PageState
-    std::shared_ptr<PageState> page_state = phys_mem_pages[target_ppn];
+    std::shared_ptr<PageState> &page_state = phys_mem_pages[target_ppn];
 
     // set PTE to ppn:0 (arbitrary), r:0, w:0
     update_pte(page_state->vpn, 0, 0, 0, page_table_base_register);
@@ -64,7 +75,6 @@ unsigned int Clock::evict() {
     // if file-backed
     else {
         // remove entry from file_table
-        // file_table.erase(FileBlock(page_state->filename, page_state->file_block));
         remove_file_table_entry(page_state->filename, page_state->file_block);
 
         // if dirty, write to disk
@@ -111,7 +121,7 @@ unsigned int Clock::tick() {
     active_pages.pop_front();
 
     // get corresponding PageState
-    std::shared_ptr<PageState> page_state =  phys_mem_pages[cur];
+    std::shared_ptr<PageState> &page_state = phys_mem_pages[cur];
     assert(page_state->ppn == cur);
 
     // check referenced bit

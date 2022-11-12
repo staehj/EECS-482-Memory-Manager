@@ -1,4 +1,4 @@
-// lab: swap-backed page lifetime
+// lab: swap-backed and file-backed random
 
 #include "vm_app.h"
 #include <unistd.h>

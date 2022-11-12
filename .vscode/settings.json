@@ -69,6 +69,7 @@
     "utility": "cpp",
     "unordered_set": "cpp",
     "deque": "cpp",
-    "queue": "cpp"
+    "queue": "cpp",
+    "iostream": "cpp"
   }
 }

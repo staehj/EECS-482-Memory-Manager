@@ -1,7 +1,9 @@
 #ifndef SHARED_H
 #define SHARED_H
 
+#include <cstring>
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -11,14 +13,13 @@
 #include "vm_pager.h"
 
 
-// extern std::unordered_map<FileBlock, std::shared_ptr<PageState>> file_table;
-extern std::unordered_map<const char*, std::unordered_map<unsigned int, std::shared_ptr<PageState>>> file_table;
+extern std::unordered_map<std::string,
+  std::unordered_map<unsigned int, std::shared_ptr<PageState>>> file_table;
 extern std::unordered_map<page_table_t*, std::vector<std::shared_ptr<PageState>>> arenas;
 extern std::unordered_map<pid_t, page_table_t*> page_tables;
 extern std::vector<std::shared_ptr<PageState>> phys_mem_pages;
 extern Clock clock_;
 extern SwapManager swap_manager;
-extern char buffer[VM_PAGESIZE];
 
 bool file_in_file_table(const char* filename, unsigned int block);
 

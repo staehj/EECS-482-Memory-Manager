@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstring>
 #include <cstdio>
+#include <string>
 #include <unordered_set>
 
 #include "clock.h"
@@ -13,7 +14,7 @@
 
 void vm_init(unsigned int memory_pages, unsigned int swap_blocks) {
     // Initialize 0 page
-    memset(vm_physmem, 0, VM_PAGESIZE);
+    std::memset(vm_physmem, 0, VM_PAGESIZE);
 
     // Initialize Clock (empty)
     clock_.fill_memory_pages(memory_pages);
@@ -34,8 +35,8 @@ int vm_create(pid_t parent_pid, pid_t child_pid) {
 
     // create 0 page in arena
     std::vector<std::shared_ptr<PageState>> child_arena;
-    child_arena.push_back(std::make_shared<PageState>(PAGE_TYPE::FILE_BACKED, 0, 0, false,
-        true, false, 0, nullptr, 0));
+    child_arena.push_back(std::make_shared<PageState>(PAGE_TYPE::FILE_BACKED, 0, 0,
+        false, true, false, 0, nullptr, 0));
 
     // add arena to arenas
     arenas[child_ptbr] = child_arena;
@@ -67,9 +68,9 @@ int vm_fault(const void* addr, bool write_flag) {
         return -1;
     }
 
-    std::vector<std::shared_ptr<PageState>> arena = arenas[page_table_base_register];
-    std::shared_ptr<PageState> page_state = arena[vpn];
-    page_table_entry_t pte = page_table_base_register->ptes[vpn];
+    std::vector<std::shared_ptr<PageState>> &arena = arenas[page_table_base_register];
+    std::shared_ptr<PageState> &page_state = arena[vpn];
+    page_table_entry_t &pte = page_table_base_register->ptes[vpn];
 
     // Note: r:1, w:1 would never fault (you can read and write to it legally)
     assert(!(pte.read_enable == 1 && pte.write_enable == 1));
@@ -120,12 +121,6 @@ int vm_fault(const void* addr, bool write_flag) {
                 // update phys_mem_pages
                 phys_mem_pages[free_ppn] = page_state;
 
-                // Note: moved this logic to vm_map
-                // // update swap manager (eager swap reservation)
-                // if (!swap_manager.reserve()) {
-                //     return -1;
-                // }
-
                 // update page state
                 page_state->ppn = free_ppn;
                 page_state->referenced = true;
@@ -155,7 +150,8 @@ int vm_fault(const void* addr, bool write_flag) {
 
             // insert into file table
             assert(!file_in_file_table(page_state->filename, page_state->file_block));
-            file_table[page_state->filename][page_state->file_block] = page_state;
+            file_table[std::string(page_state->filename)][page_state->file_block]
+                = page_state;
 
             // update page state
             page_state->ppn = ppn;
@@ -185,10 +181,10 @@ int vm_fault(const void* addr, bool write_flag) {
 }
 
 void vm_destroy() {
-    std::vector<std::shared_ptr<PageState>> arena = arenas[page_table_base_register];
+    std::vector<std::shared_ptr<PageState>> &arena = arenas[page_table_base_register];
     std::unordered_set<unsigned int> ppns;
     for (unsigned int i = 0; i < arena.size(); ++i) {
-        std::shared_ptr<PageState> page = arena[i];
+        std::shared_ptr<PageState> &page = arena[i];
         if (page->type == PAGE_TYPE::SWAP_BACKED) {
             // in MEMORY
             if (page->resident) {
@@ -209,10 +205,16 @@ void vm_destroy() {
     // delete swap block PageStates
     arenas.erase(page_table_base_register);
 
+    // delete page table from page_tables
+    for (auto itr = page_tables.begin(); itr != page_tables.end(); itr++) {
+        if (itr->second == page_table_base_register) {
+            page_tables.erase(itr);
+            break;
+        }
+    }
+
     // delete page table
     delete page_table_base_register;
-
-    // TODO: delete from page_tables??
 }
 
 void *vm_map(const char *filename, unsigned int block) {
@@ -222,7 +224,7 @@ void *vm_map(const char *filename, unsigned int block) {
         return nullptr;
     }
 
-    std::vector<std::shared_ptr<PageState>> arena = arenas[page_table_base_register];
+    std::vector<std::shared_ptr<PageState>> &arena = arenas[page_table_base_register];
     // SWAP-backed
     if (filename == nullptr) {
         // add pte to 0 page to page table
@@ -241,13 +243,15 @@ void *vm_map(const char *filename, unsigned int block) {
     // FILE-backed
     else {
         // check filename is completely in valid part of arena
-        if (!filename_valid_in_arena(filename)) {
+        const char* page_filename = get_filename(filename);
+        if (page_filename == nullptr) {
             return nullptr;
         }
 
         // page in file_table
-        if (file_in_file_table(filename, block)) {
-            std::shared_ptr<PageState> page_state = file_table[filename][block];
+        if (file_in_file_table(page_filename, block)) {
+            std::shared_ptr<PageState> &page_state
+                = file_table[std::string(page_filename)][block];
 
             // set arena PageState to point to file_table PageState
             arena.push_back(page_state);
@@ -264,7 +268,6 @@ void *vm_map(const char *filename, unsigned int block) {
         }
         // file not in file_table
         else {
-            const char* page_filename = get_filename(filename);
             unsigned int ppn = disk_to_mem(page_filename, block);
 
             // create new PageState
@@ -277,8 +280,8 @@ void *vm_map(const char *filename, unsigned int block) {
             phys_mem_pages[ppn] = new_page_state;
 
             // add file page to file table
-            // file_table[file_block] = new_page_state;
-            file_table[filename][block] = new_page_state;
+            file_table[std::string(page_filename)][block] = new_page_state;
+            assert(file_in_file_table(page_filename, block));
 
             // add PageState to arena
             arena.push_back(new_page_state);

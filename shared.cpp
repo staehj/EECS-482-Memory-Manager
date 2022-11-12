@@ -2,6 +2,8 @@
 
 #include <cassert>
 #include <cstdio>
+#include <cstring>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -19,8 +21,8 @@ Clock clock_;
 SwapManager swap_manager;
 
 // Initialize file_table (empty)
-// std::unordered_map<FileBlock, std::shared_ptr<PageState>> file_table;
-std::unordered_map<const char*, std::unordered_map<unsigned int, std::shared_ptr<PageState>>> file_table;
+std::unordered_map<std::string,
+    std::unordered_map<unsigned int, std::shared_ptr<PageState>>> file_table;
 
 // Initialize arenas (empty)
 std::unordered_map<page_table_t*, std::vector<std::shared_ptr<PageState>>> arenas;
@@ -31,13 +33,12 @@ std::unordered_map<pid_t, page_table_t*> page_tables;
 // Initialize phys_mem_pages
 std::vector<std::shared_ptr<PageState>> phys_mem_pages;
 
-// Initialize buffer
-char buffer[VM_PAGESIZE];
-
 
 bool file_in_file_table(const char* filename, unsigned int block) {
-    if (file_table.find(filename) != file_table.end()) {
-        std::unordered_map<unsigned int, std::shared_ptr<PageState>> inner = file_table[filename];
+    std::string filename_string = std::string(filename);
+    if (file_table.find(filename_string) != file_table.end()) {
+        std::unordered_map<unsigned int, std::shared_ptr<PageState>> inner
+            = file_table[filename_string];
         if (inner.find(block) != inner.end()) {
             return true;
         }
@@ -47,9 +48,10 @@ bool file_in_file_table(const char* filename, unsigned int block) {
 
 void remove_file_table_entry(const char* filename, unsigned int block) {
     assert(file_in_file_table(filename, block));
-    file_table[filename].erase(block);
-    if (file_table[filename].empty()) {
-        file_table.erase(filename);
+    std::string filename_string = std::string(filename);
+    file_table[filename_string].erase(block);
+    if (file_table[filename_string].empty()) {
+        file_table.erase(filename_string);
     }
 }
 
@@ -89,9 +91,6 @@ unsigned int va_to_vpn(const void* va){
 // - evict  : r:0, w:0 (ppn:0, arbitrary)
 // - g_f_ppn: N/A (no pte associated before)
 //
-//// buffer
-// - both   : N/A (even evict never touches buffer)
-//
 //// arena
 // - both   : N/A
 // > evict  : vpn stays the same, linked PageState is updated
@@ -111,17 +110,17 @@ unsigned int evict_or_get_free_ppn() {
     return free_ppn;
 }
 
-// buffer: relevant logic contained
-// - can be used freely before/after this function
-// 
 unsigned int disk_to_mem(const char *filename, unsigned int block) {
-    // read in file into buffer
-    file_read(filename, block, buffer);
+    // read in file into buffer (zero page temporarily)
+    file_read(filename, block, vm_physmem);
 
     unsigned int free_ppn = evict_or_get_free_ppn();
 
     // write contents of buffer into memory
-    std::memcpy((void*)ppn_to_mem_addr(free_ppn) , buffer, VM_PAGESIZE);
+    std::memcpy((void*)ppn_to_mem_addr(free_ppn) , vm_physmem, VM_PAGESIZE);
+
+    // reset 0 page
+    std::memset(vm_physmem, 0, VM_PAGESIZE);
 
     return free_ppn;
 }
@@ -129,7 +128,7 @@ unsigned int disk_to_mem(const char *filename, unsigned int block) {
 void make_page_dirty(unsigned int vpn, std::shared_ptr<PageState> page_state) {
     // update page state
     page_state->referenced = true;
-    assert(page_state->resident == true);  // TODO: remove from this abstraction?
+    assert(page_state->resident == true);
     page_state->dirty = true;
 
     // update pte
@@ -145,15 +144,17 @@ const char* get_filename(const char* va) {
     unsigned int offset = (intptr_t) va & 0xffff;
     unsigned int vpn = (intptr_t) va >> 16;
 
-    std::string file_name_string;
 
-    unsigned int vpn_index = vpn - (intptr_t) VM_ARENA_BASEADDR;
+    std::string file_name_string = "";
 
-    std::vector<std::shared_ptr<PageState>> arena = arenas[page_table_base_register];
+    unsigned int vpn_index = va_to_vpn(va);
+
+    std::vector<std::shared_ptr<PageState>> &arena = arenas[page_table_base_register];
 
     while (true) {
         // check if vpn is in valid range
-        if (vpn <= (intptr_t) VM_ARENA_BASEADDR || vpn >= lowest_invalid_vpn()) {
+        if ((intptr_t) va <= (intptr_t) VM_ARENA_BASEADDR
+        || vpn_index >= lowest_invalid_vpn()) {
             return nullptr;
         }
 
@@ -186,12 +187,18 @@ const char* get_filename(const char* va) {
         // read until null character or end of page
         while (cur_char != '\0' || cur_addr == last_addr_in_ppn(ppn)) {
             file_name_string += cur_char;
+
+            // update condition
+            cur_addr += 1;
+            cur_char = ((char*)vm_physmem)[cur_addr];
         }
 
         // if null character not reached by end, increment vpn and continue
         if (cur_char == '\0') {
             // turn vector into C-string
-            const char* file_name_c_string = file_name_string.c_str();
+            file_name_string += '\0';
+            char* file_name_c_string = new char[file_name_string.length()+1];
+            strcpy(file_name_c_string, file_name_string.c_str());
             return file_name_c_string;
         }
 

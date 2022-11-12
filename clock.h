@@ -1,6 +1,7 @@
 #ifndef CLOCK_H
 #define CLOCK_H
 
+#include <cstring>
 #include <list>
 #include <unordered_set>
 #include <queue>
@@ -10,12 +11,6 @@
 
 class Clock {
 public:
-    // Clock (unsigned int memory_pages) : max_size(memory_pages) {
-    //     for (unsigned int i = 1; i < memory_pages; ++i) {
-    //         free_pages.push(i);
-    //     }
-    // }
-
     void fill_memory_pages(unsigned int memory_pages) {
         max_size = memory_pages;
         for (unsigned int i = 1; i < memory_pages; ++i) {
@@ -49,7 +44,6 @@ private:
     unsigned int next_eviction_ppn();
 
     // pair of push/pop while checking reference bit
-    // return type TODO
     unsigned int tick();
 
     void make_free_itr(std::list<unsigned int>::iterator itr);
