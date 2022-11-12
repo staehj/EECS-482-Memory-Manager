@@ -35,6 +35,7 @@ int vm_create(pid_t parent_pid, pid_t child_pid) {
 
     // create 0 page in arena
     std::vector<std::shared_ptr<PageState>> child_arena;
+    // FILE-BACKED for 0 page is arbitrary and does not impact the progam
     child_arena.push_back(std::make_shared<PageState>(PAGE_TYPE::FILE_BACKED, 0, 0,
         false, true, false, 0, nullptr, 0));
 

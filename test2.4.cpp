@@ -1,4 +1,4 @@
-// lab: swap-backed and file-backed random
+// jjambbong
 
 #include "vm_app.h"
 #include <unistd.h>

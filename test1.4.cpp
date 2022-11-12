@@ -1,4 +1,5 @@
-// lab: swap-backed and file-backed random
+// file-back page life cycle (state diagram)
+// clock algorithm
 
 #include "vm_app.h"
 #include <unistd.h>

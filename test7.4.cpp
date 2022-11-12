@@ -1,4 +1,4 @@
-// lab: sharing file-backed pages
+// jjampong 2
 
 #include "vm_app.h"
 #include <unistd.h>
