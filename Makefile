@@ -22,7 +22,7 @@ pager: ${PAGER_OBJS} ${LIBVM_PAGER}
 	${CC} -o $@ $^
 
 # Compile an application program
-app: test1.8.cpp ${LIBVM_APP}
+app: test1.4.cpp ${LIBVM_APP}
 	${CC} -o $@ $^ -ldl
 
 # Generic rules for compiling a source file to an object file

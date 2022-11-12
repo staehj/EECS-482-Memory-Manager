@@ -28,7 +28,7 @@ void vm_init(unsigned int memory_pages, unsigned int swap_blocks) {
 
 int vm_create(pid_t parent_pid, pid_t child_pid) {
     // create deep copy of parent page table
-    page_table_t* child_ptbr = new page_table_t;
+    page_table_t* child_ptbr = new page_table_t();
 
     // add to page_tables
     page_tables[child_pid] = child_ptbr;
@@ -117,6 +117,9 @@ int vm_fault(const void* addr, bool write_flag) {
             // CASE: fresh swap-backed page (zero)
             if (page_state->ppn == 0) {
                 unsigned int free_ppn = evict_or_get_free_ppn();
+
+                // copy zero page to new ppn
+                std::memcpy((void*)ppn_to_mem_addr(free_ppn) , vm_physmem, VM_PAGESIZE);
 
                 // update phys_mem_pages
                 phys_mem_pages[free_ppn] = page_state;
