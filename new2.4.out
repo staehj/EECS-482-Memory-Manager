@@ -10,7 +10,7 @@ vm_map		(18163)	0x0	0
 vm_map returned 0x600000000
 					returning to (18163) with pages:
 					r	vpage 0x60000	ppage 0x0
-vm_map		(18163)	0x0	0
+vm_map		(18163)	0x0	07
 vm_map returned 0x600010000
 					returning to (18163) with pages:
 					r	vpage 0x60000	ppage 0x0
