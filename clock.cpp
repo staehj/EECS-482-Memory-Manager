@@ -41,6 +41,7 @@ void Clock::make_free(unsigned int ppn) {
     }
 }
 
+// returns 0 if file_write fails
 unsigned int Clock::evict() {
     assert(is_full());
     assert(free_pages.empty());
@@ -61,14 +62,11 @@ unsigned int Clock::evict() {
     if (page_state->type == PAGE_TYPE::SWAP_BACKED) {
         // if dirty, write to swap disk
         if (page_state->dirty) {
-            // determine free swap block + unreserve a swap block
-            unsigned int target_swap_block = swap_manager.get_next_free();
-
             // write page to swap file (disk)
-            file_write(nullptr, target_swap_block, (void*)ppn_to_mem_addr(target_ppn));
-
-            // update PageState swap_block
-            page_state->swap_block = target_swap_block;
+            if (file_write(nullptr, page_state->swap_block,
+                (void*)ppn_to_mem_addr(target_ppn)) == -1) {
+                return 0;
+            }
         }
     }
 
@@ -79,8 +77,10 @@ unsigned int Clock::evict() {
 
         // if dirty, write to disk
         if (page_state->dirty) {
-            file_write(page_state->filename, page_state->file_block,
-                (void*)ppn_to_mem_addr(target_ppn));
+            if (file_write(page_state->filename, page_state->file_block,
+                (void*)ppn_to_mem_addr(target_ppn)) == -1) {
+                return 0;
+            }
         }
     }
 

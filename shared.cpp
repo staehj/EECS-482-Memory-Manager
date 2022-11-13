@@ -104,12 +104,17 @@ unsigned int va_to_vpn(const void* va){
 // > evict  : vpn stays the same, linked PageState is updated
 // > g_f_ppn: vpn stays the same, PageState must be updated after this function
 //            because future PageState not guaranteed
+
+// returns 0 if file_write fails in evicted case
 unsigned int evict_or_get_free_ppn() {
     // if memory is full
     unsigned int free_ppn;
     if (clock_.is_full()) {
         // evict using clock algorithm
         free_ppn = clock_.evict();
+        if (free_ppn == 0) {
+            return 0;
+        }
     }
     else {
         free_ppn = clock_.get_free_ppn();
@@ -118,11 +123,20 @@ unsigned int evict_or_get_free_ppn() {
     return free_ppn;
 }
 
+// returns 0 if file_read or file_write (in evicted case) fails
 unsigned int disk_to_mem(const char *filename, unsigned int block) {
     // read in file into buffer (zero page temporarily)
-    file_read(filename, block, vm_physmem);
+    if (file_read(filename, block, vm_physmem) == -1) {
+        // reset 0 page
+        std::memset(vm_physmem, 0, VM_PAGESIZE);
+        return 0;
+    }
 
     unsigned int free_ppn = evict_or_get_free_ppn();
+
+    if (free_ppn == 0) {
+        return 0;
+    }
 
     // write contents of buffer into memory
     std::memcpy((void*)ppn_to_mem_addr(free_ppn) , vm_physmem, VM_PAGESIZE);

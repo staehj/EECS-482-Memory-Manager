@@ -88,14 +88,14 @@ int vm_fault(const void* addr, bool write_flag) {
             // CASE: non-resident
             unsigned int ppn = disk_to_mem(nullptr, page_state->swap_block);
 
-            // update phys_mem_pages
-            phys_mem_pages[ppn] = page_state;
-
-            // for eager swap reservation
-            if (!swap_manager.reserve()) {
+            // file_read fails (swap block not in disk)
+            // Note: should SWAP-backed should never fail file_read?
+            if (ppn == 0) {
                 return -1;
             }
-            swap_manager.make_free(page_state->swap_block);
+
+            // update phys_mem_pages
+            phys_mem_pages[ppn] = page_state;
 
             // update page state
             page_state->ppn = ppn;
@@ -104,7 +104,6 @@ int vm_fault(const void* addr, bool write_flag) {
             if (write_flag == 1) {
                 page_state->dirty = true;
             }
-            page_state->swap_block = 0;
 
             // update pte
             if (write_flag == 0) {
@@ -122,6 +121,11 @@ int vm_fault(const void* addr, bool write_flag) {
             if (page_state->ppn == 0) {
                 unsigned int free_ppn = evict_or_get_free_ppn();
 
+                // file_write failed in evicted case
+                if (free_ppn == 0) {
+                    return -1;
+                }
+
                 // copy zero page to new ppn
                 std::memcpy((void*)ppn_to_mem_addr(free_ppn) , vm_physmem, VM_PAGESIZE);
 
@@ -133,14 +137,12 @@ int vm_fault(const void* addr, bool write_flag) {
                 page_state->referenced = true;
                 page_state->resident = true;
                 page_state->dirty = true;
-                page_state->swap_block = 0;
 
                 // update pte
                 update_pte(vpn, free_ppn, 1, 1, page_table_base_register);
             }
             // CASE: existing clean page
             else {
-                assert(page_state->swap_block == 0);
                 make_page_dirty(vpn, page_state);
             }
         }
@@ -151,6 +153,11 @@ int vm_fault(const void* addr, bool write_flag) {
         if (pte.read_enable == 0 && pte.write_enable == 0) {
             // CASE: non-resident
             unsigned int ppn = disk_to_mem(page_state->filename, page_state->file_block);
+
+            // file_read failed (file not in disk)
+            if (ppn == 0) {
+                return -1;
+            }
 
             // update phys_mem_pages
             phys_mem_pages[ppn] = page_state;
@@ -197,13 +204,11 @@ void vm_destroy() {
             if (page->resident) {
                 unsigned int ppn = vpn_to_ppn(i);
                 ppns.insert(ppn);
-                swap_manager.unreserve();
             }
-            // in DISK
-            else {
-                // SwapManager: mark process swap blocks in disk as free
-                swap_manager.make_free(page->swap_block);
-            }
+            // nothing special about disk
+
+            // SwapManager: mark process swap blocks in disk as free
+            swap_manager.make_free(page->swap_block);
         }
     }
 
@@ -241,15 +246,19 @@ void *vm_map(const char *filename, unsigned int block) {
         // add pte to 0 page to page table
         update_pte(new_vpn, 0, 1, 0, page_table_base_register);
 
-        // initialize PageState and put into arena
-        arena.push_back(std::make_shared<PageState>(
-            PAGE_TYPE::SWAP_BACKED, 0, new_vpn, true, true, false, 0,
-            nullptr, 0));
-
         // update swap manager (eager swap reservation)
-        if (!swap_manager.reserve()) {
+        unsigned int swap_block;
+        if (swap_manager.num_free() == 0) {
             return nullptr;
         }
+        else {
+            swap_block = swap_manager.get_next_free();
+        }
+
+        // initialize PageState and put into arena
+        arena.push_back(std::make_shared<PageState>(
+            PAGE_TYPE::SWAP_BACKED, 0, new_vpn, true, true, false, swap_block,
+            nullptr, 0));
     }
     // FILE-backed
     else {
@@ -280,6 +289,11 @@ void *vm_map(const char *filename, unsigned int block) {
         // file not in file_table
         else {
             unsigned int ppn = disk_to_mem(page_filename, block);
+
+            // file_read failed (file not in disk)
+            if (ppn == 0) {
+                return nullptr;
+            }
 
             // create new PageState
             std::shared_ptr<PageState> new_page_state
