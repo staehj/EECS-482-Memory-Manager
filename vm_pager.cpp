@@ -67,11 +67,6 @@ int vm_fault(const void* addr, bool write_flag) {
         return -1;
     }
 
-    // // INVALID CASE: writing to zero page
-    // if (vpn == 0 && write_flag == 1) {
-    //     return -1;
-    // }
-
     std::vector<std::shared_ptr<PageState>> &arena = arenas[page_table_base_register];
     std::shared_ptr<PageState> &page_state = arena[vpn];
     page_table_entry_t &pte = page_table_base_register->ptes[vpn];
@@ -151,6 +146,8 @@ int vm_fault(const void* addr, bool write_flag) {
     else {
         // r:0, w:0
         if (pte.read_enable == 0 && pte.write_enable == 0) {
+            assert(file_in_file_table(page_state->filename, page_state->file_block));
+
             // CASE: non-resident
             unsigned int ppn = disk_to_mem(page_state->filename, page_state->file_block);
 
@@ -162,26 +159,18 @@ int vm_fault(const void* addr, bool write_flag) {
             // update phys_mem_pages
             phys_mem_pages[ppn] = page_state;
 
-            // insert into file table
-            assert(!file_in_file_table(page_state->filename, page_state->file_block));
-            file_table[std::string(page_state->filename)][page_state->file_block]
-                = page_state;
-
             // update page state
+            unsigned int read_enable = 1;
+            unsigned int write_enable = 0;
             page_state->ppn = ppn;
             page_state->referenced = true;
             page_state->resident = true;
             if (write_flag == 1) {
                 page_state->dirty = true;
+                write_enable = 1;
             }
-
-            // update pte
-            if (write_flag == 0) {
-                update_pte(vpn, ppn, 1, 0, page_table_base_register);
-            }
-            else {
-                update_pte(vpn, ppn, 1, 1, page_table_base_register);
-            }
+            // update shared_ptes
+            page_state->update_ptes(ppn, read_enable, write_enable);
         }
         // r:1, w:0
         // CASE: existing clean page
@@ -190,7 +179,6 @@ int vm_fault(const void* addr, bool write_flag) {
             make_page_dirty(vpn, page_state);
         }
     }
-
     return 0;
 }
 
@@ -199,6 +187,7 @@ void vm_destroy() {
     std::unordered_set<unsigned int> ppns;
     for (unsigned int i = 0; i < arena.size(); ++i) {
         std::shared_ptr<PageState> &page = arena[i];
+        // SWAP
         if (page->type == PAGE_TYPE::SWAP_BACKED) {
             // in MEMORY
             if (page->resident) {
@@ -209,6 +198,13 @@ void vm_destroy() {
 
             // SwapManager: mark process swap blocks in disk as free
             swap_manager.make_free(page->swap_block);
+        }
+        // FILE
+        else {
+            if (page->shared_ptes.find(page_table_base_register)
+                != page->shared_ptes.end()) {
+                page->shared_ptes.erase(page_table_base_register);
+            }
         }
     }
 
@@ -276,43 +272,45 @@ void *vm_map(const char *filename, unsigned int block) {
             // set arena PageState to point to file_table PageState
             arena.push_back(page_state);
 
+            // add pte* to shared_ptes
+            page_table_entry_t* pte = &(page_table_base_register->ptes[new_vpn]);
+            page_state->add_pte(page_table_base_register, pte);
+
             // add pte, check PageState.dirty for write_enable
-            if (page_state->dirty) {
-                update_pte(new_vpn, page_state->ppn,
-                    1, 1, page_table_base_register);
+            if (page_state->resident) {
+                if (page_state->dirty) {
+                    update_pte(new_vpn, page_state->ppn, 1, 1, page_table_base_register);
+                }
+                else {
+                    update_pte(new_vpn, page_state->ppn, 1, 0, page_table_base_register);
+                }
             }
             else {
-                update_pte(new_vpn, page_state->ppn,
-                    1, 0, page_table_base_register);
+                update_pte(new_vpn, page_state->ppn, 0, 0, page_table_base_register);
             }
         }
         // file not in file_table
         else {
-            unsigned int ppn = disk_to_mem(page_filename, block);
-
-            // file_read failed (file not in disk)
-            if (ppn == 0) {
-                return nullptr;
-            }
+            // arbitrary, doesn't actually matter
+            unsigned int ppn = 0;
 
             // create new PageState
             std::shared_ptr<PageState> new_page_state
                 = std::make_shared<PageState>(
-                    PAGE_TYPE::FILE_BACKED, ppn, new_vpn, 1, 1, 0, 0,
+                    PAGE_TYPE::FILE_BACKED, ppn, new_vpn, false, false, false, 0,
                     page_filename, block);
-
-            // update phys_mem_pages
-            phys_mem_pages[ppn] = new_page_state;
-
-            // add file page to file table
-            file_table[std::string(page_filename)][block] = new_page_state;
-            assert(file_in_file_table(page_filename, block));
+            page_table_entry_t* pte = &(page_table_base_register->ptes[new_vpn]);
+            new_page_state->add_pte(page_table_base_register, pte);
 
             // add PageState to arena
             arena.push_back(new_page_state);
 
             // add pte to page table
-            update_pte(new_vpn, ppn, 1, 0, page_table_base_register);
+            update_pte(new_vpn, ppn, 0, 0, page_table_base_register);
+
+            // add page_State to file_table
+            file_table[std::string(new_page_state->filename)][new_page_state->file_block]
+                = new_page_state;
         }
     }
 

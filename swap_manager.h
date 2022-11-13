@@ -1,6 +1,7 @@
 #ifndef SWAP_MANAGER_H
 #define SWAP_MANAGER_H
 
+#include <cassert>
 #include <queue>
 
 class SwapManager {

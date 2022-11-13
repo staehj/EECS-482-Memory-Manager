@@ -54,6 +54,21 @@ bool file_in_file_table(const char* filename, unsigned int block) {
     return false;
 }
 
+bool file_is_resident(const char* filename, unsigned int block) {
+    std::string filename_string = std::string(filename);
+    if (file_table.find(filename_string) != file_table.end()) {
+        std::unordered_map<unsigned int, std::shared_ptr<PageState>> &inner
+            = file_table[filename_string];
+        if (inner.find(block) != inner.end()) {
+            std::shared_ptr<PageState> page_state = inner[block];
+            if (page_state->resident) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 void remove_file_table_entry(const char* filename, unsigned int block) {
     assert(file_in_file_table(filename, block));
     std::string filename_string = std::string(filename);
@@ -125,24 +140,11 @@ unsigned int evict_or_get_free_ppn() {
 
 // returns 0 if file_read or file_write (in evicted case) fails
 unsigned int disk_to_mem(const char *filename, unsigned int block) {
-    // read in file into buffer (zero page temporarily)
-    if (file_read(filename, block, vm_physmem) == -1) {
-        // reset 0 page
-        std::memset(vm_physmem, 0, VM_PAGESIZE);
-        return 0;
-    }
-
     unsigned int free_ppn = evict_or_get_free_ppn();
 
-    if (free_ppn == 0) {
+    if (file_read(filename, block, (void*)ppn_to_mem_addr(free_ppn)) == -1) {
         return 0;
     }
-
-    // write contents of buffer into memory
-    std::memcpy((void*)ppn_to_mem_addr(free_ppn) , vm_physmem, VM_PAGESIZE);
-
-    // reset 0 page
-    std::memset(vm_physmem, 0, VM_PAGESIZE);
 
     return free_ppn;
 }
@@ -153,8 +155,13 @@ void make_page_dirty(unsigned int vpn, std::shared_ptr<PageState> page_state) {
     assert(page_state->resident == true);
     page_state->dirty = true;
 
-    // update pte
-    update_pte(vpn, page_state->ppn, 1, 1, page_table_base_register);
+    if (page_state->type == PAGE_TYPE::SWAP_BACKED) {
+        // update pte
+        update_pte(vpn, page_state->ppn, 1, 1, page_table_base_register);
+    }
+    else {
+        page_state->update_ptes(page_state->ppn, 1, 1);
+    }
 }
 
 unsigned int last_addr_in_ppn(unsigned int ppn) {
@@ -170,6 +177,7 @@ const char* get_filename(const char* va) {
 
     std::vector<std::shared_ptr<PageState>> &arena = arenas[page_table_base_register];
 
+    // TODO: we shud check whether the file we are looking for is in memory or disk instead of just going straight to disk
     while (true) {
         // check if vpn is in valid range
         if ((intptr_t) va < (intptr_t) VM_ARENA_BASEADDR
@@ -182,7 +190,7 @@ const char* get_filename(const char* va) {
 
         // get ppn of vpn (evicting if necessary)
         unsigned int ppn;
-        if (page_state->resident) {
+        if (page_state->resident) {  // is test 3 entering this???
             ppn = page_state->ppn;
         }
         else {

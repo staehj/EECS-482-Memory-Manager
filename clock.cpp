@@ -55,11 +55,11 @@ unsigned int Clock::evict() {
     // get corresponding PageState
     std::shared_ptr<PageState> &page_state = phys_mem_pages[target_ppn];
 
-    // set PTE to ppn:0 (arbitrary), r:0, w:0
-    update_pte(page_state->vpn, 0, 0, 0, page_table_base_register);
-
     // if swap-backed
     if (page_state->type == PAGE_TYPE::SWAP_BACKED) {
+        // set PTE to ppn:0 (arbitrary), r:0, w:0
+        update_pte(page_state->vpn, 0, 0, 0, page_table_base_register);
+
         // if dirty, write to swap disk
         if (page_state->dirty) {
             // write page to swap file (disk)
@@ -69,11 +69,10 @@ unsigned int Clock::evict() {
             }
         }
     }
-
     // if file-backed
     else {
-        // remove entry from file_table
-        remove_file_table_entry(page_state->filename, page_state->file_block);
+        // ppage 0 is arbitrary
+        page_state->update_ptes(0, 0, 0);
 
         // if dirty, write to disk
         if (page_state->dirty) {
