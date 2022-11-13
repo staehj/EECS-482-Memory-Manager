@@ -1,6 +1,7 @@
 #ifndef SHARED_H
 #define SHARED_H
 
+#include <cassert>
 #include <cstring>
 #include <memory>
 #include <string>
