@@ -43,7 +43,7 @@ struct PageState {
     void update_ptes(unsigned int ppage, unsigned int read, unsigned int write) {
         for (auto &itr : shared_ptes) {
             std::vector<page_table_entry_t*> &ptes = itr.second;
-            for (int i = 0; i < ptes.size(); ++i) {
+            for (unsigned int i = 0; i < ptes.size(); ++i) {
                 ptes[i]->ppage = ppage;
                 ptes[i]->read_enable = read;
                 ptes[i]->write_enable = write;

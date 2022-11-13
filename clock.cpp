@@ -127,6 +127,16 @@ unsigned int Clock::tick() {
     if (page_state->referenced) {
         page_state->referenced = false;
         active_pages.push_back(cur);
+        
+        // update pte/ptes
+        // set r/w to 0/0 regardless of writable or dirty
+        if (page_state->type == PAGE_TYPE::SWAP_BACKED) {
+            update_pte(page_state->vpn, page_state->ppn, 0, 0, page_table_base_register);
+        }
+        else {  // FILE-backed
+            page_state->update_ptes(page_state->ppn, 0, 0);
+        }
+
         return 0;
     }
 

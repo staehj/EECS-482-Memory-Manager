@@ -80,32 +80,50 @@ int vm_fault(const void* addr, bool write_flag) {
     if (page_state->type == PAGE_TYPE::SWAP_BACKED) {
         // r:0, w:0
         if (pte.read_enable == 0 && pte.write_enable == 0) {
+            // CASE: resident but unreferenced
+            if (page_state->resident) {
+                assert(!(page_state->referenced));
+                // mark page as referenced
+                page_state->referenced = true;
+
+                // update pte, setting writable if dirty or attempting to write
+                if (page_state->dirty || write_flag == 1) {
+                    update_pte(page_state->vpn, page_state->ppn, 1, 1,
+                        page_table_base_register);
+                }
+                else {
+                    update_pte(page_state->vpn, page_state->ppn, 1, 0,
+                        page_table_base_register);
+                }
+            }
             // CASE: non-resident
-            unsigned int ppn = disk_to_mem(nullptr, page_state->swap_block);
-
-            // file_read fails (swap block not in disk)
-            // Note: should SWAP-backed should never fail file_read?
-            if (ppn == 0) {
-                return -1;
-            }
-
-            // update phys_mem_pages
-            phys_mem_pages[ppn] = page_state;
-
-            // update page state
-            page_state->ppn = ppn;
-            page_state->referenced = true;
-            page_state->resident = true;
-            if (write_flag == 1) {
-                page_state->dirty = true;
-            }
-
-            // update pte
-            if (write_flag == 0) {
-                update_pte(vpn, ppn, 1, 0, page_table_base_register);
-            }
             else {
-                update_pte(vpn, ppn, 1, 1, page_table_base_register);
+                unsigned int ppn = disk_to_mem(nullptr, page_state->swap_block);
+
+                // file_read fails (swap block not in disk)
+                // Note: should SWAP-backed should never fail file_read?
+                if (ppn == 0) {
+                    return -1;
+                }
+
+                // update phys_mem_pages
+                phys_mem_pages[ppn] = page_state;
+
+                // update page state
+                page_state->ppn = ppn;
+                page_state->referenced = true;
+                page_state->resident = true;
+                if (write_flag == 1) {
+                    page_state->dirty = true;
+                }
+
+                // update pte
+                if (write_flag == 0) {
+                    update_pte(vpn, ppn, 1, 0, page_table_base_register);
+                }
+                else {
+                    update_pte(vpn, ppn, 1, 1, page_table_base_register);
+                }
             }
         }
         // r:1, w:0
@@ -147,30 +165,46 @@ int vm_fault(const void* addr, bool write_flag) {
         // r:0, w:0
         if (pte.read_enable == 0 && pte.write_enable == 0) {
             assert(file_in_file_table(page_state->filename, page_state->file_block));
+            // CASE: resident but unreferenced
+            if (page_state->resident) {
+                assert(!(page_state->referenced));
 
+                // mark page as referenced
+                page_state->referenced = true;
+
+                // update pte, setting writable if dirty or attempting to write
+                if (page_state->dirty || write_flag == 1) {
+                    page_state->update_ptes(page_state->ppn, 1, 1);
+                }
+                else {
+                    page_state->update_ptes(page_state->ppn, 1, 0);
+                }
+            }
             // CASE: non-resident
-            unsigned int ppn = disk_to_mem(page_state->filename, page_state->file_block);
+            else {
+                unsigned int ppn = disk_to_mem(page_state->filename, page_state->file_block);
 
-            // file_read failed (file not in disk)
-            if (ppn == 0) {
-                return -1;
+                // file_read failed (file not in disk)
+                if (ppn == 0) {
+                    return -1;
+                }
+
+                // update phys_mem_pages
+                phys_mem_pages[ppn] = page_state;
+
+                // update page state
+                unsigned int read_enable = 1;
+                unsigned int write_enable = 0;
+                page_state->ppn = ppn;
+                page_state->referenced = true;
+                page_state->resident = true;
+                if (write_flag == 1) {
+                    page_state->dirty = true;
+                    write_enable = 1;
+                }
+                // update shared_ptes
+                page_state->update_ptes(ppn, read_enable, write_enable);
             }
-
-            // update phys_mem_pages
-            phys_mem_pages[ppn] = page_state;
-
-            // update page state
-            unsigned int read_enable = 1;
-            unsigned int write_enable = 0;
-            page_state->ppn = ppn;
-            page_state->referenced = true;
-            page_state->resident = true;
-            if (write_flag == 1) {
-                page_state->dirty = true;
-                write_enable = 1;
-            }
-            // update shared_ptes
-            page_state->update_ptes(ppn, read_enable, write_enable);
         }
         // r:1, w:0
         // CASE: existing clean page
@@ -278,6 +312,9 @@ void *vm_map(const char *filename, unsigned int block) {
 
             // add pte, check PageState.dirty for write_enable
             if (page_state->resident) {
+                // set referenced bit
+                page_state->referenced = true;
+
                 if (page_state->dirty) {
                     update_pte(new_vpn, page_state->ppn, 1, 1, page_table_base_register);
                 }
