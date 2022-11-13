@@ -24,3 +24,4 @@ int main()
     char *swap2 = (char *) vm_map(nullptr, 0);  // first swap evicted
     swap2[0] = '2';
 }
+
