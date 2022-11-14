@@ -42,6 +42,4 @@ int main()
 
     char* temp2 = (char *) vm_map(nullptr, 0);
     temp2[0] = '2';  // evicts lamps (ppn2), everything else unreferenced
-
-    lamp3[0] = '3';  // evict data1 (ppn3), ppn1 unreferenced, ppn2 referenced
 }

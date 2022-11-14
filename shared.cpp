@@ -179,7 +179,6 @@ const char* get_filename(const char* va) {
 
     std::vector<std::shared_ptr<PageState>> &arena = arenas[page_table_base_register];
 
-    // TODO: we shud check whether the file we are looking for is in memory or disk instead of just going straight to disk
     while (true) {
         // check if vpn is in valid range
         if ((intptr_t) va < (intptr_t) VM_ARENA_BASEADDR
@@ -187,34 +186,47 @@ const char* get_filename(const char* va) {
             return nullptr;
         }
 
+        // // get page state of vpn
+        // std::shared_ptr<PageState> page_state = arena[vpn_index];
+
+        // // get ppn of vpn (evicting if necessary)
+        // unsigned int ppn;
+        // if (page_state->resident) {
+        //     ppn = page_state->ppn;
+        // }
+        // else {
+        //     const char* page_filename;
+        //     unsigned int page_block;
+        //     if (page_state->type == PAGE_TYPE::SWAP_BACKED) {
+        //         page_filename = nullptr;
+        //         page_block = page_state->swap_block;
+        //     }
+        //     else {
+        //         page_filename = page_state->filename;
+        //         page_block = page_state->file_block;
+        //     }
+        //     ppn = disk_to_mem(page_filename, page_block);
+        // }  //  TODO: this is wrong. we dont account for referenced here or even change pte
+        //    // consider how we can use vm fault within get filename as per lab and piazza
+
+        // check PTE for r:1, w:0, fault if not
+        if (page_table_base_register->ptes[vpn_index].read_enable == 0) {
+            if (vm_fault(va, false) == -1) {
+                return nullptr;
+            }
+        }
+
         // get page state of vpn
         std::shared_ptr<PageState> page_state = arena[vpn_index];
 
-        // get ppn of vpn (evicting if necessary)
-        unsigned int ppn;
-        if (page_state->resident) {  // is test 3 entering this???
-            ppn = page_state->ppn;
-        }
-        else {
-            const char* page_filename;
-            unsigned int page_block;
-            if (page_state->type == PAGE_TYPE::SWAP_BACKED) {
-                page_filename = nullptr;
-                page_block = page_state->swap_block;
-            }
-            else {
-                page_filename = page_state->filename;
-                page_block = page_state->file_block;
-            }
-            ppn = disk_to_mem(page_filename, page_block);
-        }
+        unsigned int ppn = page_state->ppn;
 
         // use ppn + offset and start reading byte-by-byte
         unsigned int cur_addr = (VM_PAGESIZE * ppn) + offset;
         char cur_char = ((char*)vm_physmem)[cur_addr];
 
         // read until null character or end of page
-        while (cur_char != '\0' || cur_addr == last_addr_in_ppn(ppn)) {
+        while (cur_addr <= last_addr_in_ppn(ppn) && cur_char != '\0') {
             file_name_string += cur_char;
 
             // update condition
@@ -235,13 +247,6 @@ const char* get_filename(const char* va) {
         vpn_index++;
         offset = 0;
     }
-}
-
-bool filename_valid_in_arena(const char* filename) {
-    if (get_filename(filename)) {
-        return true;
-    }
-    return false;
 }
 
 unsigned int lowest_invalid_vpn() {

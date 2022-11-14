@@ -130,7 +130,7 @@ unsigned int Clock::tick() {
     if (page_state->referenced) {
         page_state->referenced = false;
         active_pages.push_back(cur);
-        
+
         // update pte/ptes
         // set r/w to 0/0 regardless of writable or dirty
         if (page_state->type == PAGE_TYPE::SWAP_BACKED) {

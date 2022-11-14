@@ -1,5 +1,4 @@
-// file-back page life cycle (state diagram)
-// clock algorithm
+// lab: swap-backed and file-backed random
 
 #include "vm_app.h"
 #include <unistd.h>
@@ -11,33 +10,25 @@
 int main()
 {
     /* Allocate swap-backed page from the arena */
-    char *filename = (char *) vm_map(nullptr, 0);
+    char *lamp_name = (char *) vm_map(nullptr, 0);
 
     /* Write the name of the file that will be mapped */
-    strcpy(filename, "lampson83.txt");
+    strcpy(lamp_name, "lampson83.txt");  // lamp_name: ppn 1 (faults)
 
-    /* Map a page from the specified file */
-    char *p0 = (char *) vm_map (filename, 0);
+    // Map a page from the specified file */
+    char *lamp1 = (char *) vm_map (lamp_name, 0);  // succeeds
 
-    char *swap1 = (char *) vm_map(nullptr, 0);
-    swap1[0] = '1';
-    char *swap2 = (char *) vm_map(nullptr, 0);  // first swap evicted
-    swap2[0] = '2';
+    strcpy(lamp1+10, "lampson83.txt");  // lamp1: ppn 2 (faults) (file_read lamp)
 
-    std::cout << p0[5] << '\n';
-    std::cout << p0[3] << '\n';
-    p0[0] = 'x';
-    strcpy(p0+5, "hey jude, don't make it bad");
+    char *lamp2 = (char *) vm_map (lamp1+10, 0);
 
-    std::cout << p0[5] << '\n';
-    std::cout << filename[0] << '\n';
-    p0[0] = 'y';
-    std::cout << swap1[0] << '\n';
+    strcpy(lamp2+50, "data1.bin");  // lamp2: ppn 2 (no fault)
 
-    std::cout << filename[0] << '\n';
-    std::cout << swap1[0] << '\n';
-    std::cout << swap2[0] << '\n';  // p0 evicted
+    char *data1 = (char *) vm_map (lamp2+50, 0);
 
-    strcpy(p0+5, "nananananananananananananana");
+    strcpy(data1+100, "lampson83.txt");  // data1: ppn 3 (faults) (file_read data1)
 
+    char *lamp3 = (char *) vm_map (data1+100, 0);
+
+    lamp3[0] = 'L';  // no fault, write succeeds
 }

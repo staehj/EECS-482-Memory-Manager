@@ -25,15 +25,4 @@ int main()
         printf("invalid[0]: %c\n", invalid[0]);
     }
 
-    char* s1 = (char *) vm_map(nullptr, 0);
-    s1[0] = 'a';
-    char *invalid2 = (char *) vm_map(s1, 0);
-
-    if (invalid2 == nullptr) {
-        printf("filename was invalid, no null character\n");
-    }
-    else {
-        printf("filename was valid\n");
-        printf("invalid2[0]: %c\n", invalid2[0]);
-    }
 }

@@ -49,8 +49,6 @@ unsigned int last_addr_in_ppn(unsigned int ppn);
 
 const char* get_filename(const char* va);
 
-bool filename_valid_in_arena(const char* filename);
-
 unsigned int lowest_invalid_vpn();
 
 #endif
