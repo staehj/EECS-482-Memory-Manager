@@ -157,7 +157,7 @@ void make_page_dirty(unsigned int vpn, std::shared_ptr<PageState> page_state) {
 
     if (page_state->type == PAGE_TYPE::SWAP_BACKED) {
         // update pte
-        update_pte(vpn, page_state->ppn, 1, 1, page_table_base_register);
+        update_pte(vpn, page_state->ppn, 1, 1, page_state->owner_ptbr);
     }
     else {
         page_state->update_ptes(page_state->ppn, 1, 1);

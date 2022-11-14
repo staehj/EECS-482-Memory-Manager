@@ -49,12 +49,12 @@ vm_map returned 0x600000000
 vm_fault	(18098)	0x600000000	write
 vm_fault returned 0
 					returning to (18098) with pages:
-					rw	vpage 0x60000	ppage 0x3
+					rw	vpage 0x60000	ppage 0x3   // swap, filename_child
 vm_map		(18098)	0x600000000	0
 vm_map returned 0x600010000
 					returning to (18098) with pages:
-					rw	vpage 0x60000	ppage 0x3
-					r	vpage 0x60001	ppage 0x2
+					rw	vpage 0x60000	ppage 0x3   // swap, filename_child
+					r	vpage 0x60001	ppage 0x2     // file
 vm_map		(18098)	0x600000000	1
 vm_map returned 0x600020000
 					returning to (18098) with pages:
@@ -63,8 +63,8 @@ vm_map returned 0x600020000
 vm_fault	(18098)	0x600010000	write
 vm_fault returned 0
 					returning to (18098) with pages:
-					rw	vpage 0x60000	ppage 0x3
-					rw	vpage 0x60001	ppage 0x2
+					rw	vpage 0x60000	ppage 0x3   // swap, filename_child
+					rw	vpage 0x60001	ppage 0x2   // file
 vm_switch	(18097)
 					returning to (18097) with pages:
 					rw	vpage 0x60000	ppage 0x1
@@ -102,15 +102,15 @@ vm_fault	(18097)	0x600050000	write
 file_write	<swap>	0
 vm_fault returned 0
 					returning to (18097) with pages:
-					rw	vpage 0x60005	ppage 0x1
-					r	vpage 0x60006	ppage 0x0
+					rw	vpage 0x60005	ppage 0x1  // are 2 things being evicted?
+					r	vpage 0x60006	ppage 0x0   // what happened to ppn 2?
 					r	vpage 0x60007	ppage 0x0
 vm_fault	(18097)	0x600060000	write
 file_write	data1.bin	0
 vm_fault returned 0
 					returning to (18097) with pages:
 					rw	vpage 0x60005	ppage 0x1
-					rw	vpage 0x60006	ppage 0x2
+					rw	vpage 0x60006	ppage 0x2  // data1.bin evicted for swap
 					r	vpage 0x60007	ppage 0x0
 vm_fault	(18097)	0x600070000	write
 file_write	<swap>	1
@@ -118,7 +118,7 @@ vm_fault returned 0
 					returning to (18097) with pages:
 					rw	vpage 0x60005	ppage 0x1
 					rw	vpage 0x60006	ppage 0x2
-					rw	vpage 0x60007	ppage 0x3
+					rw	vpage 0x60007	ppage 0x3   // child swap evicted
 vm_fault	(18097)	0x600040000	read
 file_write	<swap>	2
 file_read	data1.bin	0
@@ -126,10 +126,10 @@ vm_fault returned 0
 					returning to (18097) with pages:
 					r	vpage 0x60002	ppage 0x1
 					r	vpage 0x60003	ppage 0x1
-					r	vpage 0x60004	ppage 0x1
+					r	vpage 0x60004	ppage 0x1  // where is ppn 2 and 3?
 vm_switch	(18098)
 					returning to (18098) with pages:
-					rw	vpage 0x60000	ppage 0x3
+					rw	vpage 0x60000	ppage 0x3  // this was evicted by parent
 					r	vpage 0x60001	ppage 0x1
 vm_fault	(18098)	0x600020000	write
 file_write	<swap>	3

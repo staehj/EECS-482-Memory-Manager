@@ -38,15 +38,9 @@ int vm_create(pid_t parent_pid, pid_t child_pid) {
 
     // create 0 page in arena
     std::vector<std::shared_ptr<PageState>> child_arena;
-    // // FILE-BACKED for 0 page is arbitrary and does not impact the progam 
-    // child_arena.push_back(std::make_shared<PageState>(PAGE_TYPE::FILE_BACKED, 0, 0,////
-    //     false, true, false, 0, nullptr, 0));
 
     // add arena to arenas
     arenas[child_ptbr] = child_arena;
-
-    // // set child 0 page
-    // update_pte(0, 0, 1, 0, child_ptbr);////
 
     return 0;
 }
@@ -89,11 +83,11 @@ int vm_fault(const void* addr, bool write_flag) {
                 // update pte, setting writable if dirty or attempting to write
                 if (page_state->dirty || write_flag == 1) {
                     update_pte(page_state->vpn, page_state->ppn, 1, 1,
-                        page_table_base_register);
+                        page_state->owner_ptbr);
                 }
                 else {
                     update_pte(page_state->vpn, page_state->ppn, 1, 0,
-                        page_table_base_register);
+                        page_state->owner_ptbr);
                 }
             }
             // CASE: non-resident
@@ -119,10 +113,10 @@ int vm_fault(const void* addr, bool write_flag) {
 
                 // update pte
                 if (write_flag == 0) {
-                    update_pte(vpn, ppn, 1, 0, page_table_base_register);
+                    update_pte(vpn, ppn, 1, 0, page_state->owner_ptbr);
                 }
                 else {
-                    update_pte(vpn, ppn, 1, 1, page_table_base_register);
+                    update_pte(vpn, ppn, 1, 1, page_state->owner_ptbr);
                 }
             }
         }
@@ -152,7 +146,7 @@ int vm_fault(const void* addr, bool write_flag) {
                 page_state->dirty = true;
 
                 // update pte
-                update_pte(vpn, free_ppn, 1, 1, page_table_base_register);
+                update_pte(vpn, free_ppn, 1, 1, page_state->owner_ptbr);
             }
             // CASE: existing clean page
             else {
@@ -288,7 +282,7 @@ void *vm_map(const char *filename, unsigned int block) {
         // initialize PageState and put into arena
         arena.push_back(std::make_shared<PageState>(
             PAGE_TYPE::SWAP_BACKED, 0, new_vpn, true, true, false, swap_block,
-            nullptr, 0));
+            page_table_base_register, nullptr, 0));
     }
     // FILE-backed
     else {
@@ -335,7 +329,7 @@ void *vm_map(const char *filename, unsigned int block) {
             std::shared_ptr<PageState> new_page_state
                 = std::make_shared<PageState>(
                     PAGE_TYPE::FILE_BACKED, ppn, new_vpn, false, false, false, 0,
-                    page_filename, block);
+                    page_table_base_register, page_filename, block);
             page_table_entry_t* pte = &(page_table_base_register->ptes[new_vpn]);
             new_page_state->add_pte(page_table_base_register, pte);
 

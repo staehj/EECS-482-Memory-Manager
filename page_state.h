@@ -23,6 +23,7 @@ struct PageState {
 
     // SWAP-backed
     unsigned int swap_block;
+    page_table_t* owner_ptbr;
 
     // FILE-backed
     const char* filename;
@@ -30,11 +31,11 @@ struct PageState {
     std::unordered_map<page_table_t*, std::vector<page_table_entry_t*>> shared_ptes;
 
     PageState(PAGE_TYPE t, unsigned int ppn, unsigned int vpn, bool referenced,
-        bool resident, bool dirty, unsigned int swap_block, const char* filename,
-        unsigned int file_block)
+        bool resident, bool dirty, unsigned int swap_block, page_table_t* owner_ptbr,
+        const char* filename, unsigned int file_block)
         : type(t), ppn(ppn), vpn(vpn), referenced(referenced), resident(resident),
-        dirty(dirty), swap_block(swap_block), filename(filename), file_block(file_block)
-        {}
+        dirty(dirty), swap_block(swap_block), owner_ptbr(owner_ptbr), filename(filename),
+        file_block(file_block) {}
 
     void add_pte(page_table_t* ptbr, page_table_entry_t* pte) {
         shared_ptes[ptbr].push_back(pte);
