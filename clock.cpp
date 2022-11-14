@@ -57,9 +57,6 @@ unsigned int Clock::evict() {
 
     // if swap-backed
     if (page_state->type == PAGE_TYPE::SWAP_BACKED) {
-        // set PTE to ppn:0 (arbitrary), r:0, w:0
-        update_pte(page_state->vpn, 0, 0, 0, page_state->owner_ptbr);
-
         // if dirty, write to swap disk
         if (page_state->dirty) {
             // write page to swap file (disk)
@@ -68,12 +65,12 @@ unsigned int Clock::evict() {
                 return 0;
             }
         }
+
+        // set PTE to ppn:0 (arbitrary), r:0, w:0
+        update_pte(page_state->vpn, 0, 0, 0, page_state->owner_ptbr);
     }
     // if file-backed
     else {
-        // ppage 0 is arbitrary
-        page_state->update_ptes(0, 0, 0);
-
         // if dirty, write to disk
         if (page_state->dirty) {
             if (file_write(page_state->filename, page_state->file_block,
@@ -81,6 +78,9 @@ unsigned int Clock::evict() {
                 return 0;
             }
         }
+
+        // ppage 0 is arbitrary
+        page_state->update_ptes(0, 0, 0);
     }
 
     // change common PageState vars
@@ -88,6 +88,9 @@ unsigned int Clock::evict() {
     page_state->dirty = false;
     page_state->referenced = false;
     page_state->resident = false;
+
+    // update phy_mem_pages
+    phys_mem_pages[target_ppn] = nullptr;
 
     // return evicted ppn
     return target_ppn;

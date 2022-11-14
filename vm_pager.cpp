@@ -52,12 +52,16 @@ void vm_switch(pid_t pid) {
 // Called when current process has a fault at virtual address addr.  write_flag
 // is true if the access that caused the fault is a write.
 int vm_fault(const void* addr, bool write_flag) {
+    if (addr < VM_ARENA_BASEADDR) {
+        return -1;
+    }
+
     // get PageState and pte using addr
     unsigned int vpn = va_to_vpn(addr);
 
     // INVALID CASE: vpn is out of bounds (not in valid arena)
     // if (addr < VM_ARENA_BASEADDR 
-    if (vpn < 0 || vpn >= lowest_invalid_vpn()) {
+    if (vpn >= lowest_invalid_vpn()) {
         return -1;
     }
 
@@ -84,6 +88,7 @@ int vm_fault(const void* addr, bool write_flag) {
                 if (page_state->dirty || write_flag == 1) {
                     update_pte(page_state->vpn, page_state->ppn, 1, 1,
                         page_state->owner_ptbr);
+                    page_state->dirty = true;
                 }
                 else {
                     update_pte(page_state->vpn, page_state->ppn, 1, 0,
@@ -169,6 +174,7 @@ int vm_fault(const void* addr, bool write_flag) {
                 // update pte, setting writable if dirty or attempting to write
                 if (page_state->dirty || write_flag == 1) {
                     page_state->update_ptes(page_state->ppn, 1, 1);
+                    page_state->dirty = true;
                 }
                 else {
                     page_state->update_ptes(page_state->ppn, 1, 0);
@@ -221,6 +227,8 @@ void vm_destroy() {
             if (page->resident) {
                 unsigned int ppn = vpn_to_ppn(i);
                 ppns.insert(ppn);
+
+                phys_mem_pages[ppn] = nullptr;
             }
             // nothing special about disk
 
@@ -260,16 +268,13 @@ void vm_destroy() {
 void *vm_map(const char *filename, unsigned int block) {
     // check that arena is not full
     unsigned int new_vpn = lowest_invalid_vpn();
-    if (new_vpn == (unsigned int) VM_ARENA_SIZE) {
+    if (new_vpn >= (unsigned int) VM_ARENA_SIZE/VM_PAGESIZE) {
         return nullptr;
     }
 
     std::vector<std::shared_ptr<PageState>> &arena = arenas[page_table_base_register];
     // SWAP-backed
     if (filename == nullptr) {
-        // add pte to 0 page to page table
-        update_pte(new_vpn, 0, 1, 0, page_table_base_register);
-
         // update swap manager (eager swap reservation)
         unsigned int swap_block;
         if (swap_manager.num_free() == 0) {
@@ -278,6 +283,9 @@ void *vm_map(const char *filename, unsigned int block) {
         else {
             swap_block = swap_manager.get_next_free();
         }
+
+        // add pte to 0 page to page table
+        update_pte(new_vpn, 0, 1, 0, page_table_base_register);
 
         // initialize PageState and put into arena
         arena.push_back(std::make_shared<PageState>(

@@ -28,7 +28,7 @@ bool file_in_file_table(const char* filename, unsigned int block);
 
 bool file_is_resident(const char* filename, unsigned int block);
 
-void remove_file_table_entry(const char* filename, unsigned int block);
+// void remove_file_table_entry(const char* filename, unsigned int block);
 
 unsigned int vpn_to_ppn(unsigned int vpn);
 

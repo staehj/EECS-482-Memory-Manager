@@ -38,10 +38,10 @@ int main() {
 
         vm_yield();
 
-        c0[0] = 'a';
+        c0[0] = 'a'; // mark c0 as referenced
 
         char *swap_child0 = (char *) vm_map (nullptr, 0);
-        swap_child0[0] = 'x';
+        swap_child0[0] = 'x';   // fault, evict not writing back
         char *swap_child1 = (char *) vm_map (nullptr, 0);
         swap_child1[0] = 'y';
         char *swap_child2 = (char *) vm_map (nullptr, 0);

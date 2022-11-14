@@ -69,14 +69,14 @@ bool file_is_resident(const char* filename, unsigned int block) {
     return false;
 }
 
-void remove_file_table_entry(const char* filename, unsigned int block) {
-    assert(file_in_file_table(filename, block));
-    std::string filename_string = std::string(filename);
-    file_table[filename_string].erase(block);
-    if (file_table[filename_string].empty()) {
-        file_table.erase(filename_string);
-    }
-}
+// void remove_file_table_entry(const char* filename, unsigned int block) {
+//     assert(file_in_file_table(filename, block));
+//     std::string filename_string = std::string(filename);
+//     file_table[filename_string].erase(block);
+//     if (file_table[filename_string].empty()) {
+//         file_table.erase(filename_string);
+//     }
+// }
 
 unsigned int vpn_to_ppn(unsigned int vpn) {
     return page_table_base_register->ptes[vpn].ppage;
@@ -143,6 +143,8 @@ unsigned int disk_to_mem(const char *filename, unsigned int block) {
     unsigned int free_ppn = evict_or_get_free_ppn();
 
     if (file_read(filename, block, (void*)ppn_to_mem_addr(free_ppn)) == -1) {
+        // make free_ppn free (since, in either case, we push back again to active_pages)
+        clock_.make_free(free_ppn);
         return 0;
     }
 
