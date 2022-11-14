@@ -69,15 +69,6 @@ bool file_is_resident(const char* filename, unsigned int block) {
     return false;
 }
 
-// void remove_file_table_entry(const char* filename, unsigned int block) {
-//     assert(file_in_file_table(filename, block));
-//     std::string filename_string = std::string(filename);
-//     file_table[filename_string].erase(block);
-//     if (file_table[filename_string].empty()) {
-//         file_table.erase(filename_string);
-//     }
-// }
-
 unsigned int vpn_to_ppn(unsigned int vpn) {
     return page_table_base_register->ptes[vpn].ppage;
 }
@@ -186,29 +177,6 @@ const char* get_filename(const char* va) {
             return nullptr;
         }
 
-        // // get page state of vpn
-        // std::shared_ptr<PageState> page_state = arena[vpn_index];
-
-        // // get ppn of vpn (evicting if necessary)
-        // unsigned int ppn;
-        // if (page_state->resident) {
-        //     ppn = page_state->ppn;
-        // }
-        // else {
-        //     const char* page_filename;
-        //     unsigned int page_block;
-        //     if (page_state->type == PAGE_TYPE::SWAP_BACKED) {
-        //         page_filename = nullptr;
-        //         page_block = page_state->swap_block;
-        //     }
-        //     else {
-        //         page_filename = page_state->filename;
-        //         page_block = page_state->file_block;
-        //     }
-        //     ppn = disk_to_mem(page_filename, page_block);
-        // }  //  TODO: this is wrong. we dont account for referenced here or even change pte
-        //    // consider how we can use vm fault within get filename as per lab and piazza
-
         // check PTE for r:1, w:0, fault if not
         if (page_table_base_register->ptes[vpn_index].read_enable == 0) {
             if (vm_fault(va, false) == -1) {
@@ -231,7 +199,9 @@ const char* get_filename(const char* va) {
 
             // update condition
             cur_addr += 1;
-            cur_char = ((char*)vm_physmem)[cur_addr];
+            if (cur_addr <= last_addr_in_ppn(ppn)) {
+                cur_char = ((char*)vm_physmem)[cur_addr];
+            }
         }
 
         // if null character not reached by end, increment vpn and continue
