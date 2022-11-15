@@ -110,7 +110,6 @@ unsigned int va_to_vpn(const void* va){
 // > evict  : vpn stays the same, linked PageState is updated
 // > g_f_ppn: vpn stays the same, PageState must be updated after this function
 //            because future PageState not guaranteed
-
 // returns 0 if file_write fails in evicted case
 unsigned int evict_or_get_free_ppn() {
     // if memory is full

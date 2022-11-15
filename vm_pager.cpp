@@ -182,7 +182,8 @@ int vm_fault(const void* addr, bool write_flag) {
             }
             // CASE: non-resident
             else {
-                unsigned int ppn = disk_to_mem(page_state->filename, page_state->file_block);
+                unsigned int ppn = disk_to_mem(page_state->filename,
+                    page_state->file_block);
 
                 // file_read failed (file not in disk)
                 if (ppn == 0) {
@@ -312,36 +313,19 @@ void *vm_map(const char *filename, unsigned int block) {
             page_table_entry_t* pte = &(page_table_base_register->ptes[new_vpn]);
             page_state->add_pte(page_table_base_register, pte);
 
-
-
-            // // add pte, check PageState.dirty for write_enable
-            // if (page_state->resident) {  // TODO: this whole block seems wrong
-            //     // set referenced bit
-            //     page_state->referenced = true; // TODO: is this true? test10.4 end
-
-            //     if (page_state->dirty) {
-            //         update_pte(new_vpn, page_state->ppn, 1, 1, page_table_base_register);
-            //     }
-            //     else {
-            //         update_pte(new_vpn, page_state->ppn, 1, 0, page_table_base_register);
-            //     }
-            // }
-            // else {
-            //     update_pte(new_vpn, page_state->ppn, 0, 0, page_table_base_register);
-            // }
-
-
             // referenced
             if (page_state->referenced) {
                 // referenced and resident
                 if (page_state->resident) {
                     // dirty
                     if (page_state->dirty) {
-                        update_pte(new_vpn, page_state->ppn, 1, 1, page_table_base_register);
+                        update_pte(new_vpn, page_state->ppn, 1, 1,
+                            page_table_base_register);
                     }
                     // clean
                     else {
-                        update_pte(new_vpn, page_state->ppn, 1, 0, page_table_base_register);
+                        update_pte(new_vpn, page_state->ppn, 1, 0,
+                            page_table_base_register);
                     }
                 }
                 // referenced, not resident
