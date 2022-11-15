@@ -9,20 +9,26 @@
 
 int main()
 {
-    /* Allocate swap-backed page from the arena */
-    char *filename = (char *) vm_map(nullptr, 0);
+    char* name = (char *) vm_map(nullptr, 0);
+    strcpy(name, "lampson83.txt");
 
-    /* Write the name of the file that will be mapped */
-    filename[VM_PAGESIZE-1] = 'a';
+    char* file = (char *) vm_map(name, 0);
+    char* file2 = (char *) vm_map(name, 0);
+    file[VM_PAGESIZE-9] = 'l';
+    file[VM_PAGESIZE-8] = 'a';
+    file[VM_PAGESIZE-7] = 'm';
+    file[VM_PAGESIZE-6] = 'p';
+    file[VM_PAGESIZE-5] = 's';
+    file[VM_PAGESIZE-4] = 'o';
+    file[VM_PAGESIZE-3] = 'n';
+    file[VM_PAGESIZE-2] = '8';
+    file[VM_PAGESIZE-1] = '3';
+    file[0] = '.';
+    file[1] = 't';
+    file[2] = 'x';
+    file[3] = 't';
+    file[4] = '\0';
 
-    char *invalid = (char *) vm_map(filename+VM_PAGESIZE-1, 0);
-
-    if (invalid == nullptr) {
-        printf("filename was invalid, reached end\n");
-    }
-    else {
-        printf("filename was valid\n");
-        printf("invalid[0]: %c\n", invalid[0]);
-    }
-
+    char* file3 = (char *) vm_map(file+VM_PAGESIZE-9, 0);
+    std::cout << file[0];
 }

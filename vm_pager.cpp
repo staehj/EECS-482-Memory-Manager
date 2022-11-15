@@ -70,7 +70,7 @@ int vm_fault(const void* addr, bool write_flag) {
     page_table_entry_t &pte = page_table_base_register->ptes[vpn];
 
     // Note: r:1, w:1 would never fault (you can read and write to it legally)
-    assert(!(pte.read_enable == 1 && pte.write_enable == 1));
+    assert(!(pte.read_enable == 1 && pte.write_enable == 1));  // 26.4
     // r:0, w:1 is impossible (stae-fficial)
     assert(!(pte.read_enable == 0 && pte.write_enable == 1));
 

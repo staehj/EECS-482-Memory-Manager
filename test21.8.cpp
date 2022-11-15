@@ -9,75 +9,31 @@
 
 int main()
 {
-    
-    if (fork()) { // parent
-        char* p1 = (char *) vm_map(nullptr, 0);
-        strcpy(p1, "lampson83.txt");
+    // filename wrote on SWAP - FILE
+    // second part of filename does not end with null character
+    // both swap-backed pages are neither evicted / unreferenced
 
-        vm_yield();
+    // create file-backed page
+    char* filename = (char*)vm_map(nullptr, 0);
+    strcpy(filename, "lampson83.txt");
 
-        char* p2 = (char *) vm_map(nullptr, 0);
-        strcpy(p2, "data1.bin");
-        char* p3 = (char *) vm_map(nullptr, 0);
-        strcpy(p3, "data2.bin");
+    // second part of filename in file-backed page (null-character terminated) 
+    char* lampson = (char*)vm_map(filename, 0);
+    lampson[0] = 'a';
+    lampson[1] = '1';
+    lampson[2] = '.';
+    lampson[3] = 'b';
+    lampson[4] = 'i';
+    lampson[5] = 'n';
+    lampson[6] = '\0';
 
-        vm_yield();
+    // first part of filename in swap-backed page
+    filename[VM_PAGESIZE - 3] = 'd';
+    filename[VM_PAGESIZE - 2] = 'a';
+    filename[VM_PAGESIZE - 1] = 't';
 
-        char* p4 = (char *) vm_map(p3, 0); // data1.bin
-
-        vm_yield();
-
-        char* p5 = (char *) vm_map(p2, 0); // data1.bin
-        strcpy(p5+100, "hello world");
+    char* data1 = (char*)vm_map(filename + VM_PAGESIZE - 3, 0);
+    for (int i = 0; i < 10; i++) {
+        std::cout << data1[i] << "\n";
     }
-    else { // child
-        char* c1 = (char *) vm_map(nullptr, 0);
-        strcpy(c1, "data1.bin");
-        char* c2 = (char *) vm_map(nullptr, 0);
-        c2[0] = 'a';
-
-        vm_yield();
-
-        char* c3 = (char *) vm_map(nullptr, 0);
-        std::cout << c3[0];
-
-        vm_yield();
-
-        std::cout << c1[0];
-
-        // child destroyed
-    }
-
-    if (fork()) {
-        vm_yield();
-        char* z1 = (char *) vm_map(nullptr, 0);  // data1
-        char* z2 = (char *) vm_map(z1, 0);  // data2
-        char* z3 = (char *) vm_map(z2, 0);  // data3
-
-        vm_yield();
-    }
-    else {
-        char* x1 = (char *) vm_map(nullptr, 0);
-        strcpy(x1, "data1.bin");
-        char* x2 = (char *) vm_map(x1, 0);
-        strcpy(x2, "data2.bin");
-        char* x3 = (char *) vm_map(x1, 0);
-        strcpy(x3, "data3.bin");
-
-        vm_yield();
-
-        x1[0] = 'a';
-
-        // child destroyed
-    }
-
-    char* v1 = (char *) vm_map(nullptr, 0);
-    char* v2 = (char *) vm_map(nullptr, 0);
-    char* v3 = (char *) vm_map(nullptr, 0);
-    char* v4 = (char *) vm_map(nullptr, 0);
-    char* v5 = (char *) vm_map(nullptr, 0);
-    v3[0] = 'v';
-    v5[0] = 'v';
-
-    // parent destroyed
 }

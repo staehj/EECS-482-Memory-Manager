@@ -133,6 +133,10 @@ unsigned int evict_or_get_free_ppn() {
 unsigned int disk_to_mem(const char *filename, unsigned int block) {
     unsigned int free_ppn = evict_or_get_free_ppn();
 
+    if (free_ppn == 0) {
+        return 0;
+    }
+
     if (file_read(filename, block, (void*)ppn_to_mem_addr(free_ppn)) == -1) {
         // make free_ppn free (since, in either case, we push back again to active_pages)
         clock_.make_free(free_ppn);
@@ -165,6 +169,7 @@ const char* get_filename(const char* va) {
     // split va into vpn + offset
     unsigned int offset = (intptr_t) va & 0xffff;
     unsigned int vpn_index = va_to_vpn(va);
+    void* fault_va = (void*) va;
 
     std::string file_name_string = "";
 
@@ -179,7 +184,7 @@ const char* get_filename(const char* va) {
 
         // check PTE for r:1, w:0, fault if not
         if (page_table_base_register->ptes[vpn_index].read_enable == 0) {
-            if (vm_fault(va, false) == -1) {
+            if (vm_fault(fault_va, false) == -1) {  // 
                 return nullptr;
             }
         }
@@ -215,6 +220,7 @@ const char* get_filename(const char* va) {
 
         // update values to read from start of next page
         vpn_index++;
+        fault_va = (void*)((intptr_t)VM_ARENA_BASEADDR + vpn_index*(intptr_t)VM_PAGESIZE);
         offset = 0;
     }
 }

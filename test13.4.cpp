@@ -9,19 +9,19 @@
 
 int main()
 {
-    /* Allocate swap-backed page from the arena */
-    char *filename = (char *) vm_map(nullptr, 0);
+    char* s1 = (char *) vm_map(nullptr, 0);
+    char* s2 = (char *) vm_map(nullptr, 0);
+    char* s3 = (char *) vm_map(nullptr, 0);
+    char* s4 = (char *) vm_map(nullptr, 0);
 
-    /* Write the name of the file that will be mapped */
-    filename[VM_PAGESIZE-1] = 'a';
-
-    char *invalid = (char *) vm_map(filename+VM_PAGESIZE-1, 0);
-
-    if (invalid == nullptr) {
-        printf("filename was invalid, reached end\n");
+    for (unsigned int i = 0; i < VM_PAGESIZE; ++i) {
+        s1[i] = 'a';
+        s2[i] = 'a';
+        s3[i] = 'a';
     }
-    else {
-        printf("filename was valid\n");
-    }
+
+    char* file = (char *) vm_map(s1, 0);
+
+    char* invalid = (char *) vm_map(file, 0);
 
 }
